@@ -1,26 +1,269 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Warm analog palette */
+  --color-cream: #faf3e8;
+  --color-cream-dark: #f0e6d6;
+  --color-charcoal: #2b2b2b;
+  --color-warm-black: #1a1816;
+  --color-warm-gray: #3d3a36;
+  --color-muted-brown: #8a7e72;
+  --color-terracotta: #c4725a;
+  --color-sage: #8a9a7b;
+  --color-film-yellow: #e8d5a3;
+  --color-blush: #d4a09a;
+
+  /* Accent */
+  --color-accent: #c4725a;
+  --color-accent-light: #d4907a;
+  --color-accent-dark: #a85d48;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", "Georgia", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
+}
+
+/* Dark-first (visionOS) */
+:root {
+  --bg: #0c0c0c;
+  --bg-secondary: #161616;
+  --text-primary: #e8e0d6;
+  --text-secondary: #8a7e72;
+  --border: #2a2725;
+}
+
+/* Light mode override */
+.light {
+  --bg: #faf3e8;
+  --bg-secondary: #f0e6d6;
+  --text-primary: #2b2b2b;
+  --text-secondary: #8a7e72;
+  --border: #e0d5c7;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text-primary);
+}
+
+::selection {
+  background-color: var(--color-terracotta);
+  color: white;
+}
+
+/* Film grain overlay */
+.film-grain::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.035;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
+
+.dark .film-grain::before {
+  mix-blend-mode: screen;
+  opacity: 0.06;
+}
+
+/* Marquee animation */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  animation: marquee 20s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-duration: 10s;
+}
+
+/* Photo print border effect */
+.photo-print {
+  padding: 10px;
+  background: #faf8f5;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+}
+
+.dark .photo-print {
+  background: #2a2725;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* 3D Glass Curtain Wall */
+.glass-card {
+  transform-origin: center center;
+  will-change: transform, opacity;
+}
+
+.glass-frame {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.dark .glass-frame {
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.glass-reflection {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.15) 0%,
+    rgba(255, 255, 255, 0.05) 30%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.03) 70%,
+    rgba(255, 255, 255, 0.08) 100%
+  );
+  border-radius: inherit;
+}
+
+.dark .glass-reflection {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.06) 0%,
+    rgba(255, 255, 255, 0.02) 30%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.01) 70%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+}
+
+.glass-card:hover .glass-frame {
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow:
+    0 12px 48px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 0 20px rgba(196, 114, 90, 0.15);
+}
+
+.dark .glass-card:hover .glass-frame {
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow:
+    0 12px 48px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 20px rgba(196, 114, 90, 0.1);
+}
+
+/* visionOS glass panel */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(40px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.light .glass-panel {
+  background: rgba(255, 255, 255, 0.6);
+  border-color: rgba(0, 0, 0, 0.06);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+/* Article prose styling */
+.prose-article {
+  line-height: 1.8;
+  color: var(--text-secondary);
+}
+
+.prose-article h1,
+.prose-article h2,
+.prose-article h3,
+.prose-article h4 {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-top: 2em;
+  margin-bottom: 0.75em;
+}
+
+.prose-article h2 { font-size: 1.25rem; }
+.prose-article h3 { font-size: 1.125rem; }
+@media (min-width: 640px) {
+  .prose-article h2 { font-size: 1.5rem; }
+  .prose-article h3 { font-size: 1.25rem; }
+}
+
+.prose-article p {
+  margin-bottom: 1.25em;
+}
+
+.prose-article a {
+  color: var(--color-terracotta);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.prose-article a:hover {
+  color: var(--color-accent-dark);
+}
+
+.prose-article code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  background: var(--bg-secondary);
+}
+
+.prose-article pre {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  padding: 0.75em;
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  overflow-x: auto;
+  margin: 1.5em 0;
+}
+
+.prose-article pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.prose-article blockquote {
+  border-left: 3px solid var(--color-terracotta);
+  padding-left: 1em;
+  margin: 1.5em 0;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.prose-article ul, .prose-article ol {
+  padding-left: 1.5em;
+  margin-bottom: 1.25em;
+}
+
+.prose-article li {
+  margin-bottom: 0.5em;
+}
+
+.prose-article ul li::marker {
+  color: var(--color-terracotta);
+}
+
+.prose-article img {
+  border-radius: 12px;
+  margin: 1.5em 0;
+}
+
+.prose-article hr {
+  border: none;
+  height: 1px;
+  background: var(--border);
+  margin: 2em 0;
 }

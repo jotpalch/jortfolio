@@ -36,6 +36,16 @@ yarn-error.log*
 # vercel
 .vercel
 
+# claude code
+.claude/
+skills-lock.json
+
+# generated at build time (rebuilt on deploy)
+public/images/photos/opt/
+src/data/_blur-map.json
+src/data/_photos-manifest.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+test-results/
