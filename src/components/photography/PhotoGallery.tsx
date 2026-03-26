@@ -2,304 +2,365 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Image from "next/image";
-import { motion, useMotionValue, useSpring } from "framer-motion";
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
 import { photosData, type Photo } from "@/data/photos";
 import { optimizedSrc, getBlurDataURL } from "@/lib/photo-utils";
-import { Camera, Film, MapPin } from "lucide-react";
 
 type FilterType = "all" | "digital" | "film";
 
 // ─── Geometry ───────────────────────────────────────────
-const COLUMN_WIDTH = 200;
-const TILE_H_SHORT = 145;
-const TILE_H_TALL = 220;
-const RADIUS = 2000;
-const NUM_COLUMNS = Math.round((2 * Math.PI * RADIUS) / COLUMN_WIDTH); // ~63 for seamless
-const PERSPECTIVE = 3200;
-const PHOTOS_PER_COL = 7;
-const IDLE_SPEED = 0.006;
-const SPRING_CONFIG = { stiffness: 60, damping: 25 };
+const RADIUS = 1400;
+const TARGET_ROW_H = 400;
+const GAP = 4; // px gap between photos
+const IDLE_SPEED = 0.0002;
+const DRAG_SENSITIVITY = 0.005;
+const FRICTION = 0.97;
+const EASE = 0.035; // lower = more smooth/laggy
 
-// Vertical stagger offsets per column (px) — creates brick-like irregularity
-function getStagger(colIndex: number): number {
-  // Pseudo-random stagger based on column index
-  const offsets = [0, -40, 15, -25, 35, -10, 20, -35, 5, -20, 30, -15, 10, -30];
-  return offsets[colIndex % offsets.length];
-}
+// ─── Justified layout ───────────────────────────────────
+type TileData = { photo: Photo; startAngle: number; arcWidth: number; h: number; y: number };
 
-// ─── Build column data ──────────────────────────────────
-function buildColumns(photos: Photo[]): Photo[][] {
-  if (photos.length === 0) return [];
-  const cols: Photo[][] = Array.from({ length: NUM_COLUMNS }, () => []);
-  for (let c = 0; c < NUM_COLUMNS; c++) {
-    for (let r = 0; r < PHOTOS_PER_COL; r++) {
-      cols[c].push(photos[(c * 3 + r * 7) % photos.length]);
+function buildJustifiedRows(photos: Photo[]): { tiles: TileData[]; totalH: number } {
+  if (photos.length === 0) return { tiles: [], totalH: 0 };
+  const circumference = 2 * Math.PI * RADIUS;
+  const fullArc = Math.PI * 2;
+  const tiles: TileData[] = [];
+
+  const bestRows = Math.min(2, photos.length);
+  const perRow = Math.ceil(photos.length / bestRows);
+  let y = 0;
+
+  // Each row: lay out photos at natural size, repeat until circle is full, stop before overlap
+  for (let r = 0; r < bestRows; r++) {
+    const rowPhotos = photos.slice(r * perRow, Math.min((r + 1) * perRow, photos.length));
+    const rowItems = rowPhotos.map((p) => ({ photo: p, naturalW: TARGET_ROW_H * (p.width / p.height) }));
+    const rowH = TARGET_ROW_H;
+    const gapAngle = (GAP / circumference) * fullArc;
+
+    let angleOffset = 0;
+    let done = false;
+    while (!done) {
+      for (const item of rowItems) {
+        const itemArc = (item.naturalW / circumference) * fullArc;
+        // Stop if this photo would overlap past the circle
+        if (angleOffset + itemArc > fullArc + 0.001) { done = true; break; }
+        tiles.push({
+          photo: item.photo,
+          startAngle: angleOffset + gapAngle / 2,
+          arcWidth: item.naturalW - GAP,
+          h: rowH - GAP,
+          y: y + GAP / 2,
+        });
+        angleOffset += itemArc;
+      }
+      // If one full set didn't fill the circle, keep repeating
+      if (angleOffset >= fullArc - 0.001) done = true;
     }
+    y += rowH;
   }
-  return cols;
+
+  return { tiles, totalH: y };
 }
 
-// ─── Photo Tile (always rectangular) ────────────────────
-function PhotoTile({
-  photo,
-  height,
-  onPhotoClick,
-  hoveredPhoto,
-  setHoveredPhoto,
-}: {
-  photo: Photo;
-  height: number;
-  onPhotoClick: (photo: Photo) => void;
-  hoveredPhoto: Photo | null;
-  setHoveredPhoto: (p: Photo | null) => void;
-}) {
-  const isHovered = hoveredPhoto === photo;
-  const siblingHovered = hoveredPhoto !== null && hoveredPhoto !== photo;
-
-  return (
-    <div
-      className="relative cursor-pointer overflow-hidden"
-      style={{ width: COLUMN_WIDTH, height }}
-      onClick={(e) => {
-        e.stopPropagation();
-        onPhotoClick(photo);
-      }}
-      onMouseEnter={() => setHoveredPhoto(photo)}
-      onMouseLeave={() => setHoveredPhoto(null)}
-    >
-      <Image
-        src={optimizedSrc(photo.src, "sm")}
-        alt={photo.alt}
-        fill
-        placeholder={getBlurDataURL(photo.src) ? "blur" : undefined}
-        blurDataURL={getBlurDataURL(photo.src)}
-        className={`object-cover transition-all duration-700 ${
-          siblingHovered ? "brightness-[0.3] saturate-[0.1]" : ""
-        } ${isHovered ? "scale-110 brightness-110" : "scale-100"}`}
-        sizes={`${COLUMN_WIDTH}px`}
-      />
-      <div
-        className={`absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-transparent to-transparent transition-opacity duration-300 ${
-          isHovered ? "opacity-100" : "opacity-0"
-        }`}
-      >
-        <div className="p-2.5">
-          <p className="text-xs font-medium text-white drop-shadow-lg">{photo.alt}</p>
-          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
-            {photo.camera && (
-              <span className="flex items-center gap-1 text-[10px] text-white/80">
-                <Camera className="h-2.5 w-2.5" /> {photo.camera}
-              </span>
-            )}
-            {photo.film && (
-              <span className="flex items-center gap-1 text-[10px] text-white/80">
-                <Film className="h-2.5 w-2.5" /> {photo.film}
-              </span>
-            )}
-            {photo.location && (
-              <span className="flex items-center gap-1 text-[10px] text-white/80">
-                <MapPin className="h-2.5 w-2.5" /> {photo.location}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Dome Wall ──────────────────────────────────────────
-function DomeWall({
-  photos,
-  hoveredPhoto,
-  setHoveredPhoto,
-  onPhotoClick,
-}: {
-  photos: Photo[];
-  hoveredPhoto: Photo | null;
-  setHoveredPhoto: (p: Photo | null) => void;
-  onPhotoClick: (photo: Photo) => void;
-}) {
+// ─── Three.js Dome Wall ─────────────────────────────────
+function DomeWall({ photos, onPhotoClick, spinning }: { photos: Photo[]; onPhotoClick: (p: Photo) => void; spinning: boolean }) {
+  const [hoverInfo, setHoverInfo] = useState<{ photo: Photo; x: number; y: number } | null>(null);
+  const mouseRef = useRef({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const stateRef = useRef<{
+    renderer: import("three").WebGLRenderer;
+    scene: import("three").Scene;
+    camera: import("three").PerspectiveCamera;
+    cylinder: import("three").Group;
+    tileMap: Map<import("three").Mesh, Photo>;
+    THREE: typeof import("three");
+    raf: number;
+  } | null>(null);
   const angleYRef = useRef(0);
-  const angleXRef = useRef(0);
+  const targetAngleYRef = useRef(0);
   const velocityYRef = useRef(0);
   const isDraggingRef = useRef(false);
-  const lastDragXRef = useRef(0);
-  const lastDragYRef = useRef(0);
-  const rafRef = useRef(0);
+  const lastXRef = useRef(0);
+  const lastYRef = useRef(0);
+  const angleXRef = useRef(0);
+  const dragDistRef = useRef(0);
+  const initedKeyRef = useRef("");
+  const texCacheRef = useRef<Map<string, import("three").Texture>>(new Map());
+  const [sceneReady, setSceneReady] = useState(false);
 
-  const rotateYVal = useMotionValue(0);
-  const rotateXVal = useMotionValue(0);
-  const springY = useSpring(rotateYVal, SPRING_CONFIG);
-  const springX = useSpring(rotateXVal, { stiffness: 40, damping: 20 });
+  const { tiles, totalH } = useMemo(() => buildJustifiedRows(photos), [photos]);
+  const photosKey = useMemo(() => photos.map((p) => p.src).join(","), [photos]);
 
-  const columns = useMemo(() => buildColumns(photos), [photos]);
+  const spinningRef = useRef(false);
+  spinningRef.current = spinning;
 
-  // Animation loop: idle spin + momentum after drag
+  // Scene setup — runs once
   useEffect(() => {
-    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const container = containerRef.current;
+    if (!container || stateRef.current) return;
+    let cancelled = false;
 
-    const tick = () => {
-      if (!prefersReduced) {
-        if (!isDraggingRef.current) {
-          // Apply momentum friction
-          if (Math.abs(velocityYRef.current) > 0.001) {
-            angleYRef.current += velocityYRef.current;
-            velocityYRef.current *= 0.97; // friction
+    import("three").then((THREE) => {
+      if (cancelled) return;
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x000000);
+      const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 1, 5000);
+      camera.position.set(0, 0, 0);
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      container.appendChild(renderer.domElement);
+      const cylinder = new THREE.Group();
+      scene.add(cylinder);
+
+      const state = { renderer, scene, camera, cylinder, tileMap: new Map() as Map<import("three").Mesh, Photo>, THREE, raf: 0 };
+
+      const tick = () => {
+        if (spinningRef.current) {
+          targetAngleYRef.current += 0.08;
+        } else if (!isDraggingRef.current) {
+          if (Math.abs(velocityYRef.current) > 0.0001) {
+            targetAngleYRef.current += velocityYRef.current;
+            velocityYRef.current *= FRICTION;
           } else {
-            // Idle drift when momentum is gone
-            velocityYRef.current = 0;
-            angleYRef.current += IDLE_SPEED;
+            targetAngleYRef.current += IDLE_SPEED;
           }
-          // Vertical tilt decays back to 0
           angleXRef.current *= 0.95;
+        }
+        angleYRef.current += (targetAngleYRef.current - angleYRef.current) * EASE;
+        cylinder.rotation.y = angleYRef.current;
+        cylinder.rotation.x = angleXRef.current;
+
+        if (!isDraggingRef.current && !spinningRef.current) {
+          const rect = container.getBoundingClientRect();
+          const mx = ((mouseRef.current.x - rect.left) / rect.width) * 2 - 1;
+          const my = -((mouseRef.current.y - rect.top) / rect.height) * 2 + 1;
+          const rc = new THREE.Raycaster();
+          rc.setFromCamera(new THREE.Vector2(mx, my), camera);
+          const hits = rc.intersectObjects(cylinder.children);
+          if (hits.length > 0) {
+            const photo = state.tileMap.get(hits[0].object as import("three").Mesh);
+            if (photo) setHoverInfo({ photo, x: mouseRef.current.x, y: mouseRef.current.y });
+            else setHoverInfo(null);
+          } else setHoverInfo(null);
+        }
+
+        renderer.render(scene, camera);
+        state.raf = requestAnimationFrame(tick);
+      };
+      state.raf = requestAnimationFrame(tick);
+
+      window.addEventListener("resize", () => {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+      });
+
+      stateRef.current = state;
+      initedKeyRef.current = "";
+      setSceneReady(true);
+    });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Tile update — runs on photo change, reuses scene (no stutter)
+  useEffect(() => {
+    const s = stateRef.current;
+    if (!s) return;
+    if (initedKeyRef.current === photosKey) return;
+    initedKeyRef.current = photosKey;
+
+    const { THREE, cylinder } = s;
+    const loader = new THREE.TextureLoader();
+
+    // Remove old tiles (keep scene + renderer)
+    while (cylinder.children.length) {
+      const c = cylinder.children[0];
+      cylinder.remove(c);
+      if (c instanceof THREE.Mesh) {
+        c.geometry.dispose();
+        (c.material as import("three").MeshBasicMaterial).dispose();
+      }
+    }
+
+    const tileMap = new Map<import("three").Mesh, Photo>();
+    const VERT_RADIUS = RADIUS * 3;
+
+    for (const tile of tiles) {
+      const arcLen = tile.arcWidth / RADIUS;
+      const yCenter = tile.y + tile.h / 2 - totalH / 2;
+      const positions: number[] = [];
+      const uvs: number[] = [];
+      const indices: number[] = [];
+
+      for (let iy = 0; iy <= 2; iy++) {
+        const v = iy / 2;
+        const localY = (0.5 - v) * tile.h;
+        const worldY = -yCenter + localY;
+        const vertAngle = worldY / VERT_RADIUS;
+        const rScale = Math.cos(vertAngle);
+        const yPos = Math.sin(vertAngle) * VERT_RADIUS;
+        for (let ix = 0; ix <= 4; ix++) {
+          const u = ix / 4;
+          const a = tile.startAngle + u * arcLen;
+          positions.push(Math.sin(a) * RADIUS * rScale, yPos, -Math.cos(a) * RADIUS * rScale);
+          uvs.push(u, 1 - v);
+        }
+      }
+      for (let iy = 0; iy < 2; iy++) {
+        for (let ix = 0; ix < 4; ix++) {
+          const a = iy * 5 + ix, b = a + 1, c = a + 5, d = c + 1;
+          indices.push(a, c, b, b, c, d);
         }
       }
 
-      rotateYVal.set(angleYRef.current);
-      rotateXVal.set(angleXRef.current);
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [rotateYVal, rotateXVal]);
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+      geo.setIndex(indices);
 
-  // Drag handlers
+      const mat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+      const mesh = new THREE.Mesh(geo, mat);
+      cylinder.add(mesh);
+      tileMap.set(mesh, tile.photo);
+
+      // Use cached texture for instant swap
+      const src = optimizedSrc(tile.photo.src, "lg");
+      const cached = texCacheRef.current.get(src);
+      if (cached) {
+        mat.map = cached; mat.color.set(0xffffff); mat.needsUpdate = true;
+      } else {
+        loader.load(src, (tex) => {
+          tex.colorSpace = THREE.SRGBColorSpace;
+          texCacheRef.current.set(src, tex);
+          mat.map = tex; mat.color.set(0xffffff); mat.needsUpdate = true;
+        });
+      }
+    }
+    s.tileMap = tileMap;
+
+    // Center camera on middle of photos (not the gap)
+    if (tiles.length > 0) {
+      const lastTile = tiles[tiles.length - 1];
+      const maxAngle = lastTile.startAngle + lastTile.arcWidth / RADIUS;
+      const centerAngle = maxAngle / 2;
+      // Rotate cylinder so centerAngle faces camera (camera looks at angle 0)
+      targetAngleYRef.current = -centerAngle;
+      angleYRef.current = -centerAngle;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photosKey, tiles, totalH, sceneReady]);
+
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     isDraggingRef.current = true;
     velocityYRef.current = 0;
-    lastDragXRef.current = e.clientX;
-    lastDragYRef.current = e.clientY;
+    dragDistRef.current = 0;
+    lastXRef.current = e.clientX;
+    lastYRef.current = e.clientY;
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
   }, []);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    mouseRef.current = { x: e.clientX, y: e.clientY };
     if (!isDraggingRef.current) return;
-    const dx = e.clientX - lastDragXRef.current;
-    const dy = e.clientY - lastDragYRef.current;
-    lastDragXRef.current = e.clientX;
-    lastDragYRef.current = e.clientY;
-
-    const sensitivity = 0.15;
-    angleYRef.current -= dx * sensitivity;
-    angleXRef.current = Math.max(-12, Math.min(12, angleXRef.current + dy * 0.08));
-    velocityYRef.current = -dx * sensitivity; // store for momentum
+    const dx = e.clientX - lastXRef.current;
+    const dy = e.clientY - lastYRef.current;
+    dragDistRef.current += Math.abs(dx) + Math.abs(dy);
+    lastXRef.current = e.clientX;
+    lastYRef.current = e.clientY;
+    targetAngleYRef.current -= dx * DRAG_SENSITIVITY;
+    velocityYRef.current = -dx * DRAG_SENSITIVITY;
+    angleXRef.current = Math.max(-0.3, Math.min(0.3, angleXRef.current - dy * 0.002));
   }, []);
 
   const handlePointerUp = useCallback(() => {
     isDraggingRef.current = false;
   }, []);
 
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    // Ignore click after drag
+    if (dragDistRef.current > 5) return;
+
+    const s = stateRef.current;
+    const container = containerRef.current;
+    if (!s || !container) return;
+
+    const rect = container.getBoundingClientRect();
+    const mouse = new s.THREE.Vector2(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1
+    );
+    const raycaster = new s.THREE.Raycaster();
+    raycaster.setFromCamera(mouse, s.camera);
+    const hits = raycaster.intersectObjects(s.cylinder.children);
+    if (hits.length > 0) {
+      const photo = s.tileMap.get(hits[0].object as import("three").Mesh);
+      if (photo) onPhotoClick(photo);
+    }
+  }, [onPhotoClick]);
+
   return (
     <div
       ref={containerRef}
-      className="relative w-full cursor-grab overflow-hidden bg-black active:cursor-grabbing"
-      style={{
-        perspective: `${PERSPECTIVE}px`,
-        perspectiveOrigin: "50% 50%",
-        height: "100vh",
-      }}
+      className="relative z-0 w-full cursor-grab bg-black active:cursor-grabbing"
+      style={{ height: "100vh" }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onPointerLeave={handlePointerUp}
+      onPointerLeave={() => { handlePointerUp(); setHoverInfo(null); }}
+      onClick={handleClick}
     >
-      {/* Vignette — heavy fade on all edges for dome feel */}
-      <div
-        className="pointer-events-none absolute inset-0 z-10"
-        style={{
-          background:
-            "radial-gradient(ellipse 85% 80% at 50% 50%, transparent 40%, rgba(0,0,0,0.6) 75%, rgba(0,0,0,0.95) 100%)",
-        }}
-      />
-
-      {/* Rotating cylinder of columns */}
-      <motion.div
-        className="relative h-full w-full"
-        style={{
-          rotateY: springY,
-          rotateX: springX,
-          transformStyle: "preserve-3d",
-        }}
-      >
-        {columns.map((colPhotos, i) => {
-          const angle = (i / NUM_COLUMNS) * 360;
-          const stagger = getStagger(i);
-
-          return (
-            <div
-              key={i}
-              className="absolute left-1/2 top-1/2"
-              style={{
-                width: COLUMN_WIDTH,
-                marginLeft: -COLUMN_WIDTH / 2,
-                transform: `rotateY(${angle}deg) translateZ(${-RADIUS}px) translateY(${stagger}px)`,
-                backfaceVisibility: "hidden",
-                // Center the column strip vertically
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "stretch",
-                // Offset so the column is centered around the midpoint
-                marginTop: -(PHOTOS_PER_COL * TILE_H_SHORT) / 2,
-              }}
-            >
-              {colPhotos.map((photo, j) => {
-                const aspect = photo.width / photo.height;
-                const h = aspect >= 1 ? TILE_H_SHORT : TILE_H_TALL;
-                return (
-                  <PhotoTile
-                    key={`${i}-${j}`}
-                    photo={photo}
-                    height={h}
-                    onPhotoClick={onPhotoClick}
-                    hoveredPhoto={hoveredPhoto}
-                    setHoveredPhoto={setHoveredPhoto}
-                  />
-                );
-              })}
-            </div>
-          );
-        })}
-      </motion.div>
+      {hoverInfo && (
+        <div
+          className="pointer-events-none fixed z-50 rounded-lg border border-white/10 bg-black/80 px-3 py-2 shadow-xl backdrop-blur-md"
+          style={{ left: hoverInfo.x + 16, top: hoverInfo.y - 10 }}
+        >
+          {(hoverInfo.photo.camera || hoverInfo.photo.film) && (
+            <p className="text-[11px] font-medium text-white/90">
+              {hoverInfo.photo.camera || hoverInfo.photo.film}
+            </p>
+          )}
+          <div className="flex gap-2 text-[10px] text-white/50">
+            {hoverInfo.photo.focalLength && <span>{hoverInfo.photo.focalLength}</span>}
+            {hoverInfo.photo.aperture && <span>{hoverInfo.photo.aperture}</span>}
+            {hoverInfo.photo.shutter && <span>{hoverInfo.photo.shutter}</span>}
+            {hoverInfo.photo.iso && <span>{hoverInfo.photo.iso}</span>}
+          </div>
+          {(hoverInfo.photo.date || hoverInfo.photo.location) && (
+            <p className="mt-0.5 text-[10px] text-white/40">
+              {[hoverInfo.photo.date, hoverInfo.photo.location].filter(Boolean).join(" · ")}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
 // ─── Mobile ─────────────────────────────────────────────
-function MobileGallery({
-  photos,
-  onPhotoClick,
-}: {
-  photos: Photo[];
-  onPhotoClick: (photo: Photo) => void;
-}) {
+function MobileGallery({ photos, onPhotoClick }: { photos: Photo[]; onPhotoClick: (p: Photo) => void }) {
   return (
     <div className="grid min-h-screen grid-cols-2 gap-0">
-      {[...photos, ...photos].map((photo, i) => {
-        const aspect = photo.width / photo.height;
-        const h = aspect >= 1 ? 140 : 200;
-        return (
-          <div
-            key={`${photo.src}-${i}`}
-            className="relative cursor-pointer overflow-hidden"
-            style={{ height: h }}
-            onClick={() => onPhotoClick(photo)}
-          >
-            <Image
-              src={optimizedSrc(photo.src, "sm")}
-              alt={photo.alt}
-              fill
-              placeholder={getBlurDataURL(photo.src) ? "blur" : undefined}
-              blurDataURL={getBlurDataURL(photo.src)}
-              className="object-cover"
-              sizes="50vw"
-            />
-          </div>
-        );
-      })}
+      {[...photos, ...photos].map((photo, i) => (
+        <div
+          key={`${photo.src}-${i}`}
+          className="relative cursor-pointer overflow-hidden"
+          style={{ height: photo.width > photo.height ? 140 : 200 }}
+          onClick={() => onPhotoClick(photo)}
+        >
+          <Image
+            src={optimizedSrc(photo.src, "sm")}
+            alt={photo.alt}
+            fill
+            placeholder={getBlurDataURL(photo.src) ? "blur" : undefined}
+            blurDataURL={getBlurDataURL(photo.src)}
+            className="object-cover"
+            sizes="50vw"
+          />
+        </div>
+      ))}
     </div>
   );
 }
@@ -307,9 +368,10 @@ function MobileGallery({
 // ─── Main export ────────────────────────────────────────
 export default function PhotoGallery() {
   const [filter, setFilter] = useState<FilterType>("all");
+  const [shuffleSeed, setShuffleSeed] = useState(0);
+  const [spinning, setSpinning] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
-  const [hoveredPhoto, setHoveredPhoto] = useState<Photo | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -319,15 +381,24 @@ export default function PhotoGallery() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  const filteredPhotos = photosData.filter((p) => {
-    if (filter === "digital") return !!p.camera;
-    if (filter === "film") return !!p.film;
-    return true;
-  });
+  const filteredPhotos = useMemo(() => {
+    const filtered = photosData.filter((p) => {
+      if (filter === "digital") return !p.film;
+      if (filter === "film") return !!p.film;
+      return true;
+    });
+    if (shuffleSeed === 0) return filtered;
+    // Shuffle with seed
+    const arr = [...filtered];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = (i * (shuffleSeed * 7 + 13) + shuffleSeed) % (i + 1);
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }, [filter, shuffleSeed]);
 
   const openLightbox = useCallback((photo: Photo) => {
-    const globalIndex = photosData.indexOf(photo);
-    setLightboxIndex(globalIndex);
+    setLightboxIndex(photosData.indexOf(photo));
     setLightboxOpen(true);
   }, []);
 
@@ -339,20 +410,14 @@ export default function PhotoGallery() {
 
   return (
     <div className="relative">
-      {/* Floating filter — top left */}
-      <div className="absolute left-6 top-6 z-30">
+      <div className="pointer-events-auto absolute left-6 top-6 z-50">
         <div className="flex gap-2 rounded-full border border-white/10 bg-black/50 px-3 py-2 shadow-2xl backdrop-blur-xl">
           {filters.map(([key, label]) => (
             <button
               key={key}
-              onClick={() => {
-                setFilter(key);
-                setHoveredPhoto(null);
-              }}
+              onClick={() => setFilter(key)}
               className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
-                filter === key
-                  ? "bg-white/20 text-white"
-                  : "text-white/60 hover:text-white"
+                filter === key ? "bg-white/20 text-white" : "text-white/60 hover:text-white"
               }`}
             >
               {label}
@@ -367,13 +432,26 @@ export default function PhotoGallery() {
       {isMobile ? (
         <MobileGallery photos={filteredPhotos} onPhotoClick={openLightbox} />
       ) : (
-        <DomeWall
-          photos={filteredPhotos}
-          hoveredPhoto={hoveredPhoto}
-          setHoveredPhoto={setHoveredPhoto}
-          onPhotoClick={openLightbox}
-        />
+        <DomeWall photos={filteredPhotos} onPhotoClick={openLightbox} spinning={spinning} />
       )}
+
+      {/* Shuffle dice — bottom right */}
+      <button
+        onPointerDown={() => setSpinning(true)}
+        onPointerUp={() => { setSpinning(false); setShuffleSeed((s) => s + 1); }}
+        onPointerLeave={() => { if (spinning) { setSpinning(false); setShuffleSeed((s) => s + 1); } }}
+        className="pointer-events-auto fixed bottom-6 right-6 z-50 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/50 backdrop-blur-xl transition-all hover:bg-white/10 hover:scale-110"
+        title="Shuffle"
+      >
+        <svg width="20" height="20" viewBox="0 0 512 512" fill="none" className="text-white/60">
+          <path d="M255.76 44.764c-6.176 0-12.353 1.384-17.137 4.152L85.87 137.276c-9.57 5.536-9.57 14.29 0 19.826l152.753 88.36c9.57 5.536 24.703 5.536 34.272 0l152.753-88.36c9.57-5.535 9.57-14.29 0-19.825l-152.753-88.36c-4.785-2.77-10.96-4.153-17.135-4.153z" stroke="currentColor" strokeWidth="12" fill="none"/>
+          <path d="M75.67 173.84c-5.753-.155-9.664 4.336-9.664 12.28v157.696c0 11.052 7.57 24.163 17.14 29.69l146.93 84.848c9.57 5.526 17.14 1.156 17.14-9.895V290.76c0-11.052-7.57-24.16-17.14-29.688l-146.93-84.847c-2.69-1.555-5.225-2.327-7.476-2.387z" stroke="currentColor" strokeWidth="12" fill="none"/>
+          <path d="M436.443 173.842c-2.25.06-4.783.83-7.474 2.385l-146.935 84.847c-9.57 5.527-17.14 18.638-17.14 29.69v157.7c0 11.05 7.57 15.418 17.14 9.89L428.97 373.51c9.57-5.527 17.137-18.636 17.137-29.688v-157.7c0-7.942-3.91-12.432-9.664-12.278z" stroke="currentColor" strokeWidth="12" fill="none"/>
+          <circle cx="180" cy="115" r="14" fill="currentColor"/><circle cx="260" cy="105" r="14" fill="currentColor"/><circle cx="340" cy="115" r="14" fill="currentColor"/>
+          <circle cx="160" cy="280" r="14" fill="currentColor"/><circle cx="190" cy="350" r="14" fill="currentColor"/>
+          <circle cx="350" cy="280" r="14" fill="currentColor"/><circle cx="320" cy="350" r="14" fill="currentColor"/>
+        </svg>
+      </button>
 
       <Lightbox
         open={lightboxOpen}
@@ -385,6 +463,11 @@ export default function PhotoGallery() {
           width: photo.width * 800,
           height: photo.height * 800,
         }))}
+        styles={{
+          container: { backgroundColor: "rgba(0,0,0,0.85)" },
+          slide: { padding: "40px 80px" },
+        }}
+        controller={{ closeOnBackdropClick: true }}
       />
     </div>
   );

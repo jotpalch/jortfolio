@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "optimize": "node scripts/optimize-images.mjs",
+    "admin": "node scripts/admin.mjs",
     "add-photo": "node scripts/add-photo.mjs",
+    "publish-photos": "node scripts/optimize-images.mjs && git add public/images/photos src/data && git commit -m 'Update photos' && git push",
     "build": "node scripts/optimize-images.mjs && next build",
     "start": "next start",
     "lint": "eslint"
@@ -14,6 +16,7 @@
     "@mdx-js/loader": "^3.1.1",
     "@mdx-js/react": "^3.1.1",
     "@next/mdx": "^16.2.1",
+    "exif-reader": "^2.0.3",
     "framer-motion": "^12.38.0",
     "gray-matter": "^4.0.3",
     "lucide-react": "^1.7.0",
@@ -24,6 +27,7 @@
     "react-dom": "19.2.4",
     "react-photo-album": "^3.5.1",
     "sharp": "^0.34.5",
+    "three": "^0.183.2",
     "yet-another-react-lightbox": "^3.29.2"
   },
   "devDependencies": {
@@ -32,6 +36,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.183.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
     "serve": "^14.2.6",

@@ -197,43 +197,43 @@ test("Articles — list renders", async ({ page }) => {
 });
 
 test("Articles — can open film article", async ({ page }) => {
-  await page.goto("/articles/why-i-shoot-film", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("h1")).toContainText("Film");
+  await page.goto("/articles/why-i-shoot-film-zhtw", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("h1")).toContainText("底片");
   await expect(page.locator(".prose-article")).toBeVisible();
 });
 
 test("Articles — can open poker AI article", async ({ page }) => {
-  await page.goto("/articles/building-poker-ai", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("h1")).toContainText("Poker");
+  await page.goto("/articles/building-poker-ai-zhtw", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("h1")).toContainText("德州撲克");
   await expect(page.locator(".prose-article")).toBeVisible();
 });
 
 test("Articles — can open GR3x article", async ({ page }) => {
-  await page.goto("/articles/ricoh-gr3x-hdf-review", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("h1")).toContainText("Ricoh");
+  await page.goto("/articles/ricoh-gr3x-hdf-review-zhtw", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("h1")).toContainText("GR3x");
   await expect(page.locator(".prose-article")).toBeVisible();
 });
 
 test("Articles — reading progress bar exists", async ({ page }) => {
-  await page.goto("/articles/why-i-shoot-film", { waitUntil: "domcontentloaded" });
+  await page.goto("/articles/why-i-shoot-film-zhtw", { waitUntil: "domcontentloaded" });
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2));
   await page.waitForTimeout(300);
   await expect(page.locator(".origin-left")).toBeVisible();
 });
 
 test("Articles — back link returns to list", async ({ page }) => {
-  await page.goto("/articles/why-i-shoot-film", { waitUntil: "domcontentloaded" });
+  await page.goto("/articles/why-i-shoot-film-zhtw", { waitUntil: "domcontentloaded" });
   await page.getByRole("link", { name: "All articles", exact: true }).click();
   await expect(page).toHaveURL(/\/articles$/);
 });
 
 test("Articles — tags displayed", async ({ page }) => {
-  await page.goto("/articles/why-i-shoot-film", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("text=photography").first()).toBeVisible();
+  await page.goto("/articles/why-i-shoot-film-zhtw", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("text=攝影").first()).toBeVisible();
 });
 
 test("Articles — reading time displayed", async ({ page }) => {
-  await page.goto("/articles/why-i-shoot-film", { waitUntil: "domcontentloaded" });
+  await page.goto("/articles/why-i-shoot-film-zhtw", { waitUntil: "domcontentloaded" });
   await expect(page.locator("text=min read").first()).toBeVisible();
 });
 
@@ -450,11 +450,213 @@ test("Mobile — about page no overflow", async ({ page }, testInfo) => {
 
 test("Mobile — articles page readable", async ({ page }, testInfo) => {
   if (testInfo.project.name !== "mobile") return test.skip();
-  await page.goto("/articles/why-i-shoot-film", { waitUntil: "domcontentloaded" });
+  await page.goto("/articles/why-i-shoot-film-zhtw", { waitUntil: "domcontentloaded" });
   const article = page.locator(".prose-article");
   const box = await article.boundingBox();
   const viewport = page.viewportSize();
   if (box && viewport) {
     expect(box.width).toBeLessThanOrEqual(viewport.width);
   }
+});
+
+// ─── Photography: Three.js canvas ──────────────────────
+test("Photography — canvas renders", async ({ page }) => {
+  await page.goto("/photography", { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(3000);
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeVisible({ timeout: 10000 });
+});
+
+test("Photography — canvas has dimensions", async ({ page }) => {
+  await page.goto("/photography", { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(3000);
+  const canvas = page.locator("canvas");
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  if (box) {
+    expect(box.width).toBeGreaterThan(100);
+    expect(box.height).toBeGreaterThan(100);
+  }
+});
+
+test("Photography — shuffle button visible", async ({ page }) => {
+  await page.goto("/photography", { waitUntil: "domcontentloaded" });
+  const dice = page.locator("button[title='Shuffle']");
+  await expect(dice).toBeVisible();
+});
+
+test("Photography — filter changes photo count", async ({ page }) => {
+  await page.goto("/photography", { waitUntil: "domcontentloaded" });
+  const countEl = page.locator("span.font-mono").first();
+  const allCount = await countEl.textContent();
+  await page.getByRole("button", { name: "Negative Film" }).click();
+  await page.waitForTimeout(500);
+  const filmCount = await countEl.textContent();
+  expect(Number(filmCount)).toBeLessThan(Number(allCount));
+});
+
+test("Photography — filter Ricoh GR3x works", async ({ page }) => {
+  await page.goto("/photography", { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "Ricoh GR3x" }).click();
+  await page.waitForTimeout(500);
+  const count = await page.locator("span.font-mono").first().textContent();
+  expect(Number(count)).toBeGreaterThan(0);
+});
+
+test("Photography — filter All restores count", async ({ page }) => {
+  await page.goto("/photography", { waitUntil: "domcontentloaded" });
+  const countEl = page.locator("span.font-mono").first();
+  const allCount = await countEl.textContent();
+  await page.getByRole("button", { name: "Negative Film" }).click();
+  await page.waitForTimeout(300);
+  await page.getByRole("button", { name: "All" }).click();
+  await page.waitForTimeout(300);
+  const restored = await countEl.textContent();
+  expect(restored).toBe(allCount);
+});
+
+// ─── Articles: all zh-TW articles ───────────────────────
+test("Articles — first-roll article loads", async ({ page }) => {
+  await page.goto("/articles/first-roll", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("h1")).toContainText("第一卷底片");
+});
+
+test("Articles — naval article loads", async ({ page }) => {
+  await page.goto("/articles/almanack-of-naval-ravikant", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("h1")).toContainText("納瓦爾寶典");
+});
+
+test("Articles — oral exam guide loads", async ({ page }) => {
+  await page.goto("/articles/nycu-cs-masters-oral-exam-guide", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("h1")).toContainText("口試");
+});
+
+test("Articles — exam notes loads", async ({ page }) => {
+  await page.goto("/articles/nycu-cs-practice-group-exam-notes", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("h1")).toContainText("筆試");
+});
+
+test("Articles — article count is 7", async ({ page }) => {
+  await page.goto("/articles", { waitUntil: "domcontentloaded" });
+  const links = page.locator("a[href*='/articles/']");
+  const count = await links.count();
+  expect(count).toBe(7);
+});
+
+test("Articles — sorted by date descending", async ({ page }) => {
+  await page.goto("/articles", { waitUntil: "domcontentloaded" });
+  const dates = await page.locator("time").allTextContents();
+  const filtered = dates.filter((d) => d.match(/\d{4}/));
+  for (let i = 1; i < filtered.length; i++) {
+    expect(filtered[i - 1] >= filtered[i]).toBeTruthy();
+  }
+});
+
+// ─── Homepage: film strip uses real photos ──────────────
+test("Home — film strip shows photos", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => window.scrollTo(0, window.innerHeight * 2));
+  await page.waitForTimeout(500);
+  await expect(page.locator("text=Recent Shots").first()).toBeVisible({ timeout: 5000 });
+});
+
+// ─── Experience: NVIDIA details ─────────────────────────
+test("Experience — NVIDIA location shows Taipei", async ({ page }) => {
+  await page.goto("/experience", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("text=Taipei").first()).toBeVisible();
+});
+
+test("Experience — shows Linux driver", async ({ page }) => {
+  await page.goto("/experience", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("text=Linux").first()).toBeVisible();
+});
+
+test("Experience — shows Agentic AI", async ({ page }) => {
+  await page.goto("/experience", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("text=Agentic").first()).toBeVisible();
+});
+
+// ─── Skills on homepage ─────────────────────────────────
+test("Home — skills include Linux Driver Development", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => window.scrollTo(0, window.innerHeight));
+  await page.waitForTimeout(500);
+  await expect(page.locator("text=Linux Driver Development").first()).toBeVisible({ timeout: 5000 });
+});
+
+test("Home — skills include Agentic AI", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => window.scrollTo(0, window.innerHeight));
+  await page.waitForTimeout(500);
+  await expect(page.locator("text=Agentic AI").first()).toBeVisible({ timeout: 5000 });
+});
+
+// ─── Dark theme ─────────────────────────────────────────
+test("Home — dark background", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  // Should be dark (#0c0c0c = rgb(12,12,12))
+  expect(bg).toMatch(/rgb\(12,\s*12,\s*12\)/);
+});
+
+// ─── Resume link ────────────────────────────────────────
+test("Home — resume PDF accessible", async ({ page }) => {
+  const res = await page.goto("/resume/resume.pdf", { waitUntil: "domcontentloaded" });
+  expect(res?.ok()).toBeTruthy();
+});
+
+// ─── Cross-page navigation flow ─────────────────────────
+test("Nav — full navigation flow", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const nav = page.locator("nav");
+
+  // Home → Projects
+  await nav.getByRole("link", { name: "Projects" }).click();
+  await expect(page).toHaveURL(/\/projects/);
+
+  // Projects → Photos
+  await nav.getByRole("link", { name: "Photos" }).click();
+  await expect(page).toHaveURL(/\/photography/);
+
+  // Photos → Articles
+  await nav.getByRole("link", { name: "Articles" }).click();
+  await expect(page).toHaveURL(/\/articles/);
+
+  // Articles → About
+  await nav.getByRole("link", { name: "About" }).click();
+  await expect(page).toHaveURL(/\/about/);
+
+  // About → Home
+  await nav.getByRole("link", { name: "jotpac" }).click();
+  await expect(page).toHaveURL("/");
+});
+
+// ─── Mobile: photography ────────────────────────────────
+test("Mobile — photography page loads", async ({ page }, testInfo) => {
+  if (testInfo.project.name !== "mobile") return test.skip();
+  await page.goto("/photography", { waitUntil: "domcontentloaded" });
+  // Mobile shows grid, not canvas
+  const grid = page.locator(".grid");
+  await expect(grid).toBeVisible({ timeout: 5000 });
+});
+
+test("Mobile — photography filter visible", async ({ page }, testInfo) => {
+  if (testInfo.project.name !== "mobile") return test.skip();
+  await page.goto("/photography", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("button", { name: "All" })).toBeVisible();
+});
+
+// ─── Performance: page load time ────────────────────────
+test("Home — loads within 5 seconds", async ({ page }) => {
+  const start = Date.now();
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const elapsed = Date.now() - start;
+  expect(elapsed).toBeLessThan(5000);
+});
+
+test("Articles — list loads within 5 seconds", async ({ page }) => {
+  const start = Date.now();
+  await page.goto("/articles", { waitUntil: "domcontentloaded" });
+  const elapsed = Date.now() - start;
+  expect(elapsed).toBeLessThan(5000);
 });

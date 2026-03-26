@@ -9,15 +9,19 @@ export interface Photo {
   camera?: string;
   film?: string;
   location?: string;
+  date?: string;
+  focalLength?: string;
+  aperture?: string;
+  shutter?: string;
+  iso?: string;
 }
 
-type ManifestEntry = { file: string; src: string; width: number; height: number };
+type ManifestEntry = {
+  file: string; src: string; width: number; height: number;
+  camera?: string; date?: string; focalLength?: string;
+  aperture?: string; shutter?: string; iso?: string;
+};
 
-/**
- * Merges auto-discovered photos (from build-time scan) with manual metadata.
- * Any image in public/images/photos/ appears automatically.
- * Add metadata in photos-meta.ts to enrich entries.
- */
 export const photosData: Photo[] = (manifest as ManifestEntry[]).map((entry) => {
   const meta = photosMeta[entry.file] ?? {};
   return {
@@ -25,8 +29,13 @@ export const photosData: Photo[] = (manifest as ManifestEntry[]).map((entry) => 
     width: entry.width,
     height: entry.height,
     alt: meta.alt ?? entry.file.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "),
-    ...(meta.camera && { camera: meta.camera }),
+    camera: meta.camera ?? entry.camera,
     ...(meta.film && { film: meta.film }),
     ...(meta.location && { location: meta.location }),
+    ...(entry.date && { date: entry.date }),
+    ...(entry.focalLength && { focalLength: entry.focalLength }),
+    ...(entry.aperture && { aperture: entry.aperture }),
+    ...(entry.shutter && { shutter: entry.shutter }),
+    ...(entry.iso && { iso: entry.iso }),
   };
 });
