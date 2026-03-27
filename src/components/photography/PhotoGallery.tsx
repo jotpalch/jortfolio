@@ -6,6 +6,7 @@ import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
 import { photosData, type Photo } from "@/data/photos";
 import { optimizedSrc, getBlurDataURL } from "@/lib/photo-utils";
+import DiceButton from "./DiceButton";
 
 type FilterType = "all" | "digital" | "film";
 
@@ -14,7 +15,7 @@ const RADIUS = 1400;
 const TARGET_ROW_H = 400;
 const GAP = 4; // px gap between photos
 const IDLE_SPEED = 0.0002;
-const DRAG_SENSITIVITY = 0.005;
+const DRAG_SENSITIVITY = 0.003;
 const FRICTION = 0.97;
 const EASE = 0.08; // lower = more smooth/laggy
 
@@ -131,6 +132,19 @@ function DomeWall({ photos, onPhotoClick, spinning }: { photos: Photo[]; onPhoto
         angleYRef.current += (targetAngleYRef.current - angleYRef.current) * EASE;
         cylinder.rotation.y = angleYRef.current;
         cylinder.rotation.x = angleXRef.current;
+
+        // Centrifugal effect: flatten Y toward center when spinning fast
+        const speed = Math.abs(velocityYRef.current);
+        // Only flatten at high speed (threshold 0.02), max flatten 0.5
+        const rawFlatten = Math.max(0, (speed - 0.02) * 8);
+        const flatten = Math.min(0.5, rawFlatten);
+        cylinder.children.forEach((child) => {
+          if ("_baseY" in child.userData === false) child.userData._baseY = child.position.y;
+          const baseY = child.userData._baseY as number;
+          child.position.y = baseY * (1 - flatten);
+        });
+        // Also scale Y slightly to compress rows
+        cylinder.scale.y = 1 - flatten * 0.3;
 
         if (!isDraggingRef.current && !spinningRef.current) {
           const rect = container.getBoundingClientRect();
@@ -584,22 +598,40 @@ export default function PhotoGallery() {
     ["film", "Negative Film"],
   ];
 
+  const filterBtnsRef = useRef<(HTMLButtonElement | null)[]>([]);
+  const [indicator, setIndicator] = useState({ left: 0, width: 0 });
+
+  useEffect(() => {
+    const idx = filters.findIndex(([k]) => k === filter);
+    const btn = filterBtnsRef.current[idx];
+    if (btn) {
+      setIndicator({ left: btn.offsetLeft, width: btn.offsetWidth });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]);
+
   return (
     <div className="relative">
       <div className="pointer-events-auto fixed left-6 top-6 z-50 md:left-1/2 md:-translate-x-1/2">
-        <div className="flex gap-2 rounded-full border border-white/10 bg-black/50 px-3 py-2 shadow-2xl backdrop-blur-xl">
-          {filters.map(([key, label]) => (
+        <div className="relative flex items-center gap-1 rounded-full border border-white/10 bg-black/50 px-2 py-1.5 shadow-2xl backdrop-blur-xl">
+          {/* Sliding glass indicator */}
+          <div
+            className="absolute rounded-full bg-white/15 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+            style={{ left: indicator.left, width: indicator.width, top: 4, bottom: 4 }}
+          />
+          {filters.map(([key, label], i) => (
             <button
               key={key}
+              ref={(el) => { filterBtnsRef.current[i] = el; }}
               onClick={() => setFilter(key)}
-              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
-                filter === key ? "bg-white/20 text-white" : "text-white/60 hover:text-white"
+              className={`relative z-10 rounded-full px-4 py-1.5 text-xs font-medium transition-colors duration-200 ${
+                filter === key ? "text-white" : "text-white/50 hover:text-white/80"
               }`}
             >
               {label}
             </button>
           ))}
-          <span className="self-center pl-2 font-mono text-[10px] text-white/40">
+          <span className="relative z-10 self-center pl-2 font-mono text-[10px] text-white/40">
             {filteredPhotos.length}
           </span>
         </div>
@@ -612,22 +644,12 @@ export default function PhotoGallery() {
       )}
 
       {/* Shuffle dice — bottom right */}
-      <button
-        onPointerDown={() => setSpinning(true)}
-        onPointerUp={() => { setSpinning(false); setShuffleSeed((s) => s + 1); }}
-        onPointerLeave={() => { if (spinning) { setSpinning(false); setShuffleSeed((s) => s + 1); } }}
-        className="pointer-events-auto fixed bottom-20 right-6 z-50 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/50 backdrop-blur-xl transition-all hover:bg-white/10 hover:scale-110"
-        title="Shuffle"
-      >
-        <svg width="20" height="20" viewBox="0 0 512 512" fill="none" className="text-white/60">
-          <path d="M255.76 44.764c-6.176 0-12.353 1.384-17.137 4.152L85.87 137.276c-9.57 5.536-9.57 14.29 0 19.826l152.753 88.36c9.57 5.536 24.703 5.536 34.272 0l152.753-88.36c9.57-5.535 9.57-14.29 0-19.825l-152.753-88.36c-4.785-2.77-10.96-4.153-17.135-4.153z" stroke="currentColor" strokeWidth="12" fill="none"/>
-          <path d="M75.67 173.84c-5.753-.155-9.664 4.336-9.664 12.28v157.696c0 11.052 7.57 24.163 17.14 29.69l146.93 84.848c9.57 5.526 17.14 1.156 17.14-9.895V290.76c0-11.052-7.57-24.16-17.14-29.688l-146.93-84.847c-2.69-1.555-5.225-2.327-7.476-2.387z" stroke="currentColor" strokeWidth="12" fill="none"/>
-          <path d="M436.443 173.842c-2.25.06-4.783.83-7.474 2.385l-146.935 84.847c-9.57 5.527-17.14 18.638-17.14 29.69v157.7c0 11.05 7.57 15.418 17.14 9.89L428.97 373.51c9.57-5.527 17.137-18.636 17.137-29.688v-157.7c0-7.942-3.91-12.432-9.664-12.278z" stroke="currentColor" strokeWidth="12" fill="none"/>
-          <circle cx="180" cy="115" r="14" fill="currentColor"/><circle cx="260" cy="105" r="14" fill="currentColor"/><circle cx="340" cy="115" r="14" fill="currentColor"/>
-          <circle cx="160" cy="280" r="14" fill="currentColor"/><circle cx="190" cy="350" r="14" fill="currentColor"/>
-          <circle cx="350" cy="280" r="14" fill="currentColor"/><circle cx="320" cy="350" r="14" fill="currentColor"/>
-        </svg>
-      </button>
+      <DiceButton
+        spinning={spinning}
+        onDown={() => setSpinning(true)}
+        onUp={() => { setSpinning(false); setShuffleSeed((s) => s + 1); }}
+        className="pointer-events-auto fixed bottom-20 right-6 z-50 md:bottom-6"
+      />
 
       <Lightbox
         open={lightboxOpen}
