@@ -16,7 +16,7 @@ const GAP = 4; // px gap between photos
 const IDLE_SPEED = 0.0002;
 const DRAG_SENSITIVITY = 0.005;
 const FRICTION = 0.97;
-const EASE = 0.035; // lower = more smooth/laggy
+const EASE = 0.08; // lower = more smooth/laggy
 
 // ─── Justified layout ───────────────────────────────────
 type TileData = { photo: Photo; startAngle: number; arcWidth: number; h: number; y: number };
@@ -341,26 +341,48 @@ function DomeWall({ photos, onPhotoClick, spinning }: { photos: Photo[]; onPhoto
 
 // ─── Mobile ─────────────────────────────────────────────
 function MobileGallery({ photos, onPhotoClick }: { photos: Photo[]; onPhotoClick: (p: Photo) => void }) {
+  const [tapped, setTapped] = useState<number | null>(null);
+
   return (
-    <div className="grid min-h-screen grid-cols-2 gap-0">
-      {[...photos, ...photos].map((photo, i) => (
-        <div
-          key={`${photo.src}-${i}`}
-          className="relative cursor-pointer overflow-hidden"
-          style={{ height: photo.width > photo.height ? 140 : 200 }}
-          onClick={() => onPhotoClick(photo)}
-        >
-          <Image
-            src={optimizedSrc(photo.src, "sm")}
-            alt={photo.alt}
-            fill
-            placeholder={getBlurDataURL(photo.src) ? "blur" : undefined}
-            blurDataURL={getBlurDataURL(photo.src)}
-            className="object-cover"
-            sizes="50vw"
-          />
-        </div>
-      ))}
+    <div className="grid min-h-screen grid-cols-2 gap-0.5 bg-black pb-20">
+      {[...photos, ...photos].map((photo, i) => {
+        const showInfo = tapped === i;
+        const hasInfo = photo.camera || photo.film || photo.focalLength || photo.date;
+        return (
+          <div
+            key={`${photo.src}-${i}`}
+            className="relative cursor-pointer overflow-hidden"
+            style={{ height: photo.width > photo.height ? 140 : 200 }}
+            onClick={() => {
+              if (showInfo) { onPhotoClick(photo); setTapped(null); }
+              else if (hasInfo) setTapped(i);
+              else onPhotoClick(photo);
+            }}
+          >
+            <Image
+              src={optimizedSrc(photo.src, "sm")}
+              alt={photo.alt}
+              fill
+              placeholder={getBlurDataURL(photo.src) ? "blur" : undefined}
+              blurDataURL={getBlurDataURL(photo.src)}
+              className="object-cover"
+              sizes="50vw"
+            />
+            {showInfo && (
+              <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/20 to-transparent p-2.5">
+                <div className="flex flex-col gap-0.5 text-[10px] text-white/80">
+                  {(photo.camera || photo.film) && <span className="font-medium">{photo.camera || photo.film}</span>}
+                  <span className="text-white/50">
+                    {[photo.focalLength, photo.aperture, photo.shutter, photo.iso].filter(Boolean).join(" · ")}
+                  </span>
+                  {photo.date && <span className="text-white/40">{photo.date}</span>}
+                </div>
+                <p className="mt-1 text-[9px] text-white/30">tap again to view</p>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -410,7 +432,7 @@ export default function PhotoGallery() {
 
   return (
     <div className="relative">
-      <div className="pointer-events-auto absolute left-6 top-6 z-50">
+      <div className="pointer-events-auto fixed left-6 top-6 z-50 md:left-1/2 md:-translate-x-1/2">
         <div className="flex gap-2 rounded-full border border-white/10 bg-black/50 px-3 py-2 shadow-2xl backdrop-blur-xl">
           {filters.map(([key, label]) => (
             <button
@@ -440,7 +462,7 @@ export default function PhotoGallery() {
         onPointerDown={() => setSpinning(true)}
         onPointerUp={() => { setSpinning(false); setShuffleSeed((s) => s + 1); }}
         onPointerLeave={() => { if (spinning) { setSpinning(false); setShuffleSeed((s) => s + 1); } }}
-        className="pointer-events-auto fixed bottom-6 right-6 z-50 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/50 backdrop-blur-xl transition-all hover:bg-white/10 hover:scale-110"
+        className="pointer-events-auto fixed bottom-20 right-6 z-50 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/50 backdrop-blur-xl transition-all hover:bg-white/10 hover:scale-110"
         title="Shuffle"
       >
         <svg width="20" height="20" viewBox="0 0 512 512" fill="none" className="text-white/60">

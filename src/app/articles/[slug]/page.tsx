@@ -45,7 +45,7 @@ export default async function ArticlePage({ params }: Props) {
           </Link>
 
           <header className="mb-12">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <time className="font-mono text-xs text-muted-brown">
                 {article.meta.date}
               </time>
@@ -55,11 +55,11 @@ export default async function ArticlePage({ params }: Props) {
                 {article.meta.readingTime} min read
               </span>
               <span className="text-muted-brown/30">&middot;</span>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {article.meta.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="rounded-full border border-[var(--border)] px-2 py-0.5 font-mono text-xs text-muted-brown"
+                    className="whitespace-nowrap rounded-full border border-[var(--border)] px-2 py-0.5 font-mono text-xs text-muted-brown"
                   >
                     {tag}
                   </span>
@@ -82,7 +82,7 @@ export default async function ArticlePage({ params }: Props) {
           </article>
 
           {/* End of article */}
-          <div className="mt-16 border-t border-[var(--border)] pt-8">
+          <div className="mt-16 border-t border-[var(--border)] pb-24 pt-8">
             <Link
               href="/articles"
               className="inline-flex items-center gap-2 text-sm font-medium text-terracotta hover:underline"
