@@ -133,18 +133,26 @@ function DomeWall({ photos, onPhotoClick, spinning }: { photos: Photo[]; onPhoto
         cylinder.rotation.y = angleYRef.current;
         cylinder.rotation.x = angleXRef.current;
 
-        // Centrifugal effect: flatten Y toward center when spinning fast
-        const speed = Math.abs(velocityYRef.current);
-        // Only flatten at high speed (threshold 0.02), max flatten 0.5
-        const rawFlatten = Math.max(0, (speed - 0.02) * 8);
-        const flatten = Math.min(0.5, rawFlatten);
-        cylinder.children.forEach((child) => {
-          if ("_baseY" in child.userData === false) child.userData._baseY = child.position.y;
-          const baseY = child.userData._baseY as number;
-          child.position.y = baseY * (1 - flatten);
-        });
-        // Also scale Y slightly to compress rows
-        cylinder.scale.y = 1 - flatten * 0.3;
+        // Centrifugal effect: only when dice is spinning (not drag)
+        if (spinningRef.current) {
+          const speed = Math.abs(velocityYRef.current);
+          const rawFlatten = Math.max(0, (speed - 0.02) * 8);
+          const flatten = Math.min(0.5, rawFlatten);
+          cylinder.children.forEach((child) => {
+            if ("_baseY" in child.userData === false) child.userData._baseY = child.position.y;
+            const baseY = child.userData._baseY as number;
+            child.position.y = baseY * (1 - flatten);
+          });
+          cylinder.scale.y = 1 - flatten * 0.3;
+        } else {
+          // Restore to normal
+          cylinder.children.forEach((child) => {
+            if ("_baseY" in child.userData) {
+              child.position.y += ((child.userData._baseY as number) - child.position.y) * 0.1;
+            }
+          });
+          cylinder.scale.y += (1 - cylinder.scale.y) * 0.1;
+        }
 
         if (!isDraggingRef.current && !spinningRef.current) {
           const rect = container.getBoundingClientRect();
