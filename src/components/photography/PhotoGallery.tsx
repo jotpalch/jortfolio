@@ -165,7 +165,54 @@ function DomeWall({ photos, onPhotoClick, spinning }: { photos: Photo[]; onPhoto
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Tile update — runs on photo change, reuses scene (no stutter)
+  const animatingRef = useRef(false);
+  const animCancelRef = useRef(0); // increment to cancel running animation
+  const isFirstLoad = useRef(true);
+
+  // Helper: create tile mesh
+  function createTileMesh(tile: TileData, THREE: typeof import("three"), transparent = false) {
+    const VERT_RADIUS = RADIUS * 3;
+    const arcLen = tile.arcWidth / RADIUS;
+    const yCenter = tile.y + tile.h / 2 - totalH / 2;
+    const positions: number[] = [];
+    const uvs: number[] = [];
+    const indices: number[] = [];
+
+    for (let iy = 0; iy <= 2; iy++) {
+      const v = iy / 2;
+      const localY = (0.5 - v) * tile.h;
+      const worldY = -yCenter + localY;
+      const vertAngle = worldY / VERT_RADIUS;
+      const rScale = Math.cos(vertAngle);
+      const yPos = Math.sin(vertAngle) * VERT_RADIUS;
+      for (let ix = 0; ix <= 4; ix++) {
+        const u = ix / 4;
+        const a = tile.startAngle + u * arcLen;
+        positions.push(Math.sin(a) * RADIUS * rScale, yPos, -Math.cos(a) * RADIUS * rScale);
+        uvs.push(u, 1 - v);
+      }
+    }
+    for (let iy = 0; iy < 2; iy++) {
+      for (let ix = 0; ix < 4; ix++) {
+        const a = iy * 5 + ix, b = a + 1, c = a + 5, d = c + 1;
+        indices.push(a, c, b, b, c, d);
+      }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setIndex(indices);
+
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x111111,
+      transparent,
+      opacity: transparent ? 0 : 1,
+    });
+    return new THREE.Mesh(geo, mat);
+  }
+
+  // Tile update with scatter/assemble animation
   useEffect(() => {
     const s = stateRef.current;
     if (!s) return;
@@ -175,81 +222,188 @@ function DomeWall({ photos, onPhotoClick, spinning }: { photos: Photo[]; onPhoto
     const { THREE, cylinder } = s;
     const loader = new THREE.TextureLoader();
 
-    // Remove old tiles (keep scene + renderer)
-    while (cylinder.children.length) {
-      const c = cylinder.children[0];
-      cylinder.remove(c);
-      if (c instanceof THREE.Mesh) {
-        c.geometry.dispose();
-        (c.material as import("three").MeshBasicMaterial).dispose();
-      }
+    // First load: no animation, just place tiles
+    if (isFirstLoad.current) {
+      isFirstLoad.current = false;
+      buildAndPlaceTiles();
+      centerCamera();
+      return;
     }
 
-    const tileMap = new Map<import("three").Mesh, Photo>();
-    const VERT_RADIUS = RADIUS * 3;
+    // Cancel any running animation
+    animCancelRef.current++;
+    const cancelToken = animCancelRef.current;
+    animatingRef.current = true;
 
-    for (const tile of tiles) {
-      const arcLen = tile.arcWidth / RADIUS;
-      const yCenter = tile.y + tile.h / 2 - totalH / 2;
-      const positions: number[] = [];
-      const uvs: number[] = [];
-      const indices: number[] = [];
+    // Phase 1: Quick uniform fade out
+    const oldMeshes = [...cylinder.children] as import("three").Mesh[];
+    oldMeshes.forEach((m) => {
+      (m.material as import("three").MeshBasicMaterial).transparent = true;
+    });
 
-      for (let iy = 0; iy <= 2; iy++) {
-        const v = iy / 2;
-        const localY = (0.5 - v) * tile.h;
-        const worldY = -yCenter + localY;
-        const vertAngle = worldY / VERT_RADIUS;
-        const rScale = Math.cos(vertAngle);
-        const yPos = Math.sin(vertAngle) * VERT_RADIUS;
-        for (let ix = 0; ix <= 4; ix++) {
-          const u = ix / 4;
-          const a = tile.startAngle + u * arcLen;
-          positions.push(Math.sin(a) * RADIUS * rScale, yPos, -Math.cos(a) * RADIUS * rScale);
-          uvs.push(u, 1 - v);
-        }
-      }
-      for (let iy = 0; iy < 2; iy++) {
-        for (let ix = 0; ix < 4; ix++) {
-          const a = iy * 5 + ix, b = a + 1, c = a + 5, d = c + 1;
-          indices.push(a, c, b, b, c, d);
-        }
-      }
+    let outFrame = 0;
 
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-      geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
-      geo.setIndex(indices);
-
-      const mat = new THREE.MeshBasicMaterial({ color: 0x111111 });
-      const mesh = new THREE.Mesh(geo, mat);
-      cylinder.add(mesh);
-      tileMap.set(mesh, tile.photo);
-
-      // Use cached texture for instant swap
-      const src = optimizedSrc(tile.photo.src, "lg");
-      const cached = texCacheRef.current.get(src);
-      if (cached) {
-        mat.map = cached; mat.color.set(0xffffff); mat.needsUpdate = true;
+    function fadeOutTick() {
+      if (cancelToken !== animCancelRef.current) return;
+      outFrame++;
+      const t = outFrame / 10;
+      oldMeshes.forEach((mesh) => {
+        (mesh.material as import("three").MeshBasicMaterial).opacity = Math.max(0, 1 - t);
+      });
+      if (outFrame < 10) {
+        requestAnimationFrame(fadeOutTick);
       } else {
-        loader.load(src, (tex) => {
-          tex.colorSpace = THREE.SRGBColorSpace;
-          texCacheRef.current.set(src, tex);
-          mat.map = tex; mat.color.set(0xffffff); mat.needsUpdate = true;
+        oldMeshes.forEach((m) => {
+          cylinder.remove(m);
+          m.geometry.dispose();
+          (m.material as import("three").MeshBasicMaterial).dispose();
         });
+        fadeInNewTiles();
       }
     }
-    s.tileMap = tileMap;
 
-    // Center camera on middle of photos (not the gap)
-    if (tiles.length > 0) {
-      const lastTile = tiles[tiles.length - 1];
-      const maxAngle = lastTile.startAngle + lastTile.arcWidth / RADIUS;
-      const centerAngle = maxAngle / 2;
-      // Rotate cylinder so centerAngle faces camera (camera looks at angle 0)
-      targetAngleYRef.current = -centerAngle;
-      angleYRef.current = -centerAngle;
+    // Phase 2: 5D's style — rapid cascade with flash
+    function fadeInNewTiles() {
+      if (cancelToken !== animCancelRef.current) return;
+      const tileMap = new Map<import("three").Mesh, Photo>();
+      const newMeshes: import("three").Mesh[] = [];
+
+      // Build sweep order: alternate between rows (row1[0], row2[0], row1[1], row2[1]...)
+      const rows: number[][] = [];
+      let currentRow = -1;
+      tiles.forEach((tile, i) => {
+        const rowIdx = Math.round(tile.y * 100); // group by y position
+        if (rowIdx !== currentRow) { rows.push([]); currentRow = rowIdx; }
+        rows[rows.length - 1].push(i);
+      });
+
+      const sweepOrder: number[] = [];
+      const maxLen = Math.max(...rows.map((r) => r.length));
+      for (let col = 0; col < maxLen; col++) {
+        for (const row of rows) {
+          if (col < row.length) sweepOrder.push(row[col]);
+        }
+      }
+
+      // Each tile gets a delay based on sweep position (1.5 frames apart)
+      const delays = new Array(tiles.length).fill(0);
+      sweepOrder.forEach((idx, rank) => { delays[idx] = rank * 1.5; });
+
+      for (const tile of tiles) {
+        const mesh = createTileMesh(tile, THREE, true);
+        const mat = mesh.material as import("three").MeshBasicMaterial;
+        mat.opacity = 0;
+        cylinder.add(mesh);
+        newMeshes.push(mesh);
+        tileMap.set(mesh, tile.photo);
+
+        const src = optimizedSrc(tile.photo.src, "lg");
+        const cached = texCacheRef.current.get(src);
+        if (cached) {
+          mat.map = cached; mat.color.set(0xffffff); mat.needsUpdate = true;
+        } else {
+          loader.load(src, (tex) => {
+            tex.colorSpace = THREE.SRGBColorSpace;
+            texCacheRef.current.set(src, tex);
+            mat.map = tex; mat.color.set(0xffffff); mat.needsUpdate = true;
+          });
+        }
+      }
+
+      if (s) s.tileMap = tileMap;
+      centerCamera();
+
+      let inFrame = 0;
+      const FLASH_FRAMES = 8;
+      const totalFrames = Math.max(...delays) + FLASH_FRAMES + 5;
+
+      function flashTick() {
+        if (cancelToken !== animCancelRef.current) return;
+        inFrame++;
+
+        newMeshes.forEach((mesh, i) => {
+          const localFrame = inFrame - delays[i];
+          if (localFrame <= 0) return;
+          const mat = mesh.material as import("three").MeshBasicMaterial;
+
+          if (localFrame <= 1) {
+            // Flash: appear bright white
+            mat.opacity = 0.7;
+            mat.color.set(0xffffff);
+          } else if (localFrame <= 3) {
+            // Bright flash peak
+            mat.opacity = 1;
+            mat.color.set(0xcccccc);
+          } else if (localFrame <= FLASH_FRAMES) {
+            // Settle to normal
+            const t = (localFrame - 3) / (FLASH_FRAMES - 3);
+            mat.opacity = 1;
+            mat.color.setRGB(1, 1, 1); // back to texture color
+          } else {
+            mat.opacity = 1;
+          }
+        });
+
+        if (inFrame < totalFrames) {
+          requestAnimationFrame(flashTick);
+        } else {
+          newMeshes.forEach((mesh) => {
+            const mat = mesh.material as import("three").MeshBasicMaterial;
+            mat.opacity = 1;
+            mat.transparent = false;
+            mat.color.set(0xffffff);
+            mat.needsUpdate = true;
+          });
+          animatingRef.current = false;
+        }
+      }
+
+      requestAnimationFrame(flashTick);
     }
+
+    function buildAndPlaceTiles() {
+      while (cylinder.children.length) {
+        const c = cylinder.children[0];
+        cylinder.remove(c);
+        if (c instanceof THREE.Mesh) {
+          c.geometry.dispose();
+          (c.material as import("three").MeshBasicMaterial).dispose();
+        }
+      }
+
+      const tileMap = new Map<import("three").Mesh, Photo>();
+      for (const tile of tiles) {
+        const mesh = createTileMesh(tile, THREE);
+        cylinder.add(mesh);
+        tileMap.set(mesh, tile.photo);
+
+        const src = optimizedSrc(tile.photo.src, "lg");
+        const cached = texCacheRef.current.get(src);
+        const mat = mesh.material as import("three").MeshBasicMaterial;
+        if (cached) {
+          mat.map = cached; mat.color.set(0xffffff); mat.needsUpdate = true;
+        } else {
+          loader.load(src, (tex) => {
+            tex.colorSpace = THREE.SRGBColorSpace;
+            texCacheRef.current.set(src, tex);
+            mat.map = tex; mat.color.set(0xffffff); mat.needsUpdate = true;
+          });
+        }
+      }
+      if (s) s.tileMap = tileMap;
+    }
+
+    function centerCamera() {
+      if (tiles.length > 0) {
+        const lastTile = tiles[tiles.length - 1];
+        const maxAngle = lastTile.startAngle + lastTile.arcWidth / RADIUS;
+        const centerAngle = maxAngle / 2;
+        targetAngleYRef.current = -centerAngle;
+        angleYRef.current = -centerAngle;
+      }
+    }
+
+    requestAnimationFrame(fadeOutTick);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photosKey, tiles, totalH, sceneReady]);
 
