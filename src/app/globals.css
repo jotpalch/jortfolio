@@ -29,6 +29,7 @@ html {
 
 /* Dark-first (visionOS) */
 :root {
+  color-scheme: dark;
   --bg: #0c0c0c;
   --bg-secondary: #161616;
   --text-primary: #e8e0d6;
@@ -71,8 +72,8 @@ body {
 }
 
 .dark .film-grain::before {
-  mix-blend-mode: screen;
-  opacity: 0.06;
+  mix-blend-mode: overlay;
+  opacity: 0.04;
 }
 
 /* SL train animation */
@@ -169,6 +170,7 @@ body {
 /* visionOS glass panel */
 .glass-panel {
   background: rgba(255, 255, 255, 0.04);
+  -webkit-backdrop-filter: blur(40px);
   backdrop-filter: blur(40px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 1rem;

@@ -47,6 +47,9 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-touch-icon.png",
   },
+  other: {
+    "color-scheme": "dark",
+  },
 };
 
 export default function RootLayout({
