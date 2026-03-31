@@ -30,4 +30,12 @@ export const photosMeta: Record<
   "R0000359.JPG": { camera: "Ricoh GR IIIx HDF" },
   "R0000360.JPG": { camera: "Ricoh GR IIIx HDF" },
   "R0000418.JPG": { camera: "Ricoh GR IIIx HDF" },
+  "000096950004.jpg": { camera: "Fuji Cardia Hite", film: "Kodak Ektar 100", location: "Tailand" },
+  "000096950005.jpg": { camera: "Fuji Cardia Hite", film: "Kodak Ektar 100", location: "Tailand" },
+  "000096950019.jpg": { camera: "Fuji Cardia Hite", film: "Kodak Ektar 100" },
+  "000096950020.jpg": { camera: "Fuji Cardia Hite", film: "Kodak Ektar 100" },
+  "000096950021.jpg": { camera: "Fuji Cardia Hite", film: "Kodak Ektar 100" },
+  "000096950027.jpg": { camera: "Fuji Cardia Hite", film: "Kodak Ektar 100" },
+  "000096950032.jpg": { camera: "Fuji Cardia Hite", film: "Kodak Ektar 100" },
+  "000096950034.jpg": { camera: "Fuji Cardia Hite", film: "Kodak Ektar 100" },
 };
