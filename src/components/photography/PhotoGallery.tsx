@@ -15,7 +15,7 @@ const RADIUS = 1400;
 const TARGET_ROW_H = 400;
 const GAP = 4; // px gap between photos
 const IDLE_SPEED = 0.0002;
-const DRAG_SENSITIVITY = 0.003;
+const DRAG_SENSITIVITY = 0.001;
 const FRICTION = 0.97;
 const EASE = 0.08; // lower = more smooth/laggy
 
