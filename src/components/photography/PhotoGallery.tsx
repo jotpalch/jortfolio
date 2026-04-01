@@ -90,6 +90,7 @@ function DomeWall({ photos, onPhotoClick, spinning }: { photos: Photo[]; onPhoto
   const lastYRef = useRef(0);
   const angleXRef = useRef(0);
   const dragDistRef = useRef(0);
+  const isOverCanvasRef = useRef(false);
   const initedKeyRef = useRef("");
   const texCacheRef = useRef<Map<string, import("three").Texture>>(new Map());
   const [sceneReady, setSceneReady] = useState(false);
@@ -158,7 +159,7 @@ function DomeWall({ photos, onPhotoClick, spinning }: { photos: Photo[]; onPhoto
           cylinder.scale.y += (1 - cylinder.scale.y) * 0.1;
         }
 
-        if (!isDraggingRef.current && !spinningRef.current) {
+        if (!isDraggingRef.current && !spinningRef.current && isOverCanvasRef.current) {
           const rect = container.getBoundingClientRect();
           const mx = ((mouseRef.current.x - rect.left) / rect.width) * 2 - 1;
           const my = -((mouseRef.current.y - rect.top) / rect.height) * 2 + 1;
@@ -487,10 +488,11 @@ function DomeWall({ photos, onPhotoClick, spinning }: { photos: Photo[]; onPhoto
       ref={containerRef}
       className="relative z-0 w-full cursor-grab bg-black active:cursor-grabbing"
       style={{ height: "100vh" }}
+      onPointerEnter={() => { isOverCanvasRef.current = true; }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onPointerLeave={() => { handlePointerUp(); setHoverInfo(null); }}
+      onPointerLeave={() => { isOverCanvasRef.current = false; handlePointerUp(); setHoverInfo(null); }}
       onClick={handleClick}
     >
       {hoverInfo && (

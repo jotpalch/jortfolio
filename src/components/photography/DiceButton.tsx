@@ -161,7 +161,6 @@ export default function DiceButton({ spinning, onDown, onUp, className }: DiceBu
       onPointerDown={(e) => { e.preventDefault(); onDown(); }}
       onPointerUp={onUp}
       onPointerLeave={() => { if (spinningRef.current) onUp(); }}
-      title="Shuffle"
     >
       {/* Outer ring */}
       <div className="flex h-9 w-9 md:h-[42px] md:w-[42px] cursor-pointer items-center justify-center overflow-hidden rounded-full border border-white/10 bg-black/40 backdrop-blur-xl transition-all hover:bg-white/10 hover:scale-110">
