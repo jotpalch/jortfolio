@@ -529,7 +529,7 @@ function MobileGallery({ photos, onPhotoClick }: { photos: Photo[]; onPhotoClick
 
   return (
     <div className="mobile-gallery min-h-screen columns-2 gap-0.5 bg-black pb-20">
-      {[...photos, ...photos].map((photo, i) => {
+      {photos.map((photo, i) => {
         const showInfo = tapped === i;
         const hasInfo = photo.camera || photo.film || photo.focalLength || photo.date;
         return (
@@ -646,7 +646,7 @@ export default function PhotoGallery() {
   return (
     <div className="relative">
       <div className="pointer-events-auto fixed left-6 top-6 z-50 md:left-1/2 md:-translate-x-1/2">
-        <div className="relative flex items-center gap-1 rounded-full border border-white/10 bg-black/50 px-2 py-1.5 shadow-2xl backdrop-blur-xl">
+        <div className="relative flex w-fit items-center gap-1 rounded-full border border-white/10 bg-black/50 px-2 py-1.5 shadow-2xl backdrop-blur-xl">
           {/* Sliding glass indicator */}
           <div
             className="absolute rounded-full bg-white/15 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
