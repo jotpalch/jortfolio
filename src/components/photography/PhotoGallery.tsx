@@ -524,11 +524,11 @@ function DomeWall({ photos, onPhotoClick, spinning }: { photos: Photo[]; onPhoto
 }
 
 // ─── Mobile ─────────────────────────────────────────────
-function MobileGallery({ photos, onPhotoClick }: { photos: Photo[]; onPhotoClick: (p: Photo) => void }) {
+function MobileGallery({ photos, onPhotoClick, hasSubFilter }: { photos: Photo[]; onPhotoClick: (p: Photo) => void; hasSubFilter: boolean }) {
   const [tapped, setTapped] = useState<number | null>(null);
 
   return (
-    <div className="mobile-gallery min-h-screen columns-2 gap-0.5 bg-black pb-20 pt-16">
+    <div className={`mobile-gallery min-h-screen columns-2 gap-0.5 bg-black pb-20 transition-[padding] duration-300 ${hasSubFilter ? "pt-28" : "pt-20"}`}>
       {photos.map((photo, i) => {
         const showInfo = tapped === i;
         const hasInfo = photo.camera || photo.film || photo.focalLength || photo.date;
@@ -700,7 +700,7 @@ export default function PhotoGallery() {
       </div>
 
       {isMobile ? (
-        <MobileGallery photos={filteredPhotos} onPhotoClick={openLightbox} />
+        <MobileGallery photos={filteredPhotos} onPhotoClick={openLightbox} hasSubFilter={filter === "film"} />
       ) : (
         <DomeWall photos={filteredPhotos} onPhotoClick={openLightbox} spinning={spinning} />
       )}
