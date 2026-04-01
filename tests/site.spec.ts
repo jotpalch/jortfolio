@@ -547,8 +547,8 @@ test("Photography — canvas has dimensions", async ({ page }, testInfo) => {
 
 test("Photography — shuffle button visible", async ({ page }) => {
   await page.goto("/photography", { waitUntil: "domcontentloaded" });
-  // Dice is now a Three.js canvas inside a div with title="Shuffle"
-  const dice = page.locator("[title='Shuffle']");
+  // Dice is a Three.js canvas inside a div with aria-label="Shuffle"
+  const dice = page.locator("[aria-label='Shuffle']");
   await expect(dice).toBeVisible({ timeout: 10000 });
 });
 
