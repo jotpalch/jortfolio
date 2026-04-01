@@ -528,14 +528,14 @@ function MobileGallery({ photos, onPhotoClick }: { photos: Photo[]; onPhotoClick
   const [tapped, setTapped] = useState<number | null>(null);
 
   return (
-    <div className="mobile-gallery min-h-screen columns-2 gap-0.5 bg-black pb-20">
+    <div className="mobile-gallery min-h-screen columns-2 gap-0.5 bg-black pb-20 pt-16">
       {photos.map((photo, i) => {
         const showInfo = tapped === i;
         const hasInfo = photo.camera || photo.film || photo.focalLength || photo.date;
         return (
           <div
             key={`${photo.src}-${i}`}
-            className="relative mb-0.5 cursor-pointer overflow-hidden"
+            className="relative mb-0.5 cursor-pointer overflow-hidden break-inside-avoid"
             style={{ height: photo.width > photo.height ? 140 : 200 }}
             onClick={() => {
               if (showInfo) { onPhotoClick(photo); setTapped(null); }
