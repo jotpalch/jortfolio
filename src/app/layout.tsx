@@ -38,6 +38,13 @@ export const metadata: Metadata = {
     url: "https://www.jotpac.com",
     siteName: "Wei-Cheng Chen",
     type: "website",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Wei-Cheng Chen — Engineer & Photographer" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Wei-Cheng Chen — Engineer & Photographer",
+    description: "System Software Engineer at NVIDIA. Film photography & Ricoh GR3x HDF.",
+    images: ["/og-image.png"],
   },
   icons: {
     icon: [
@@ -64,6 +71,25 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Person",
+              name: "Wei-Cheng Chen",
+              url: "https://www.jotpac.com",
+              jobTitle: "System Software Engineer",
+              worksFor: { "@type": "Organization", name: "NVIDIA" },
+              sameAs: [
+                "https://github.com/jotpalch",
+                "https://www.linkedin.com/in/jotpalch",
+              ],
+            }),
+          }}
+        />
         <Script
           src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
           strategy="afterInteractive"
@@ -78,8 +104,11 @@ export default function RootLayout({
         </Script>
       </head>
       <body className="film-grain min-h-screen overflow-x-hidden bg-[var(--bg)] font-sans text-[var(--text-primary)] antialiased">
+        <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[9999] focus:rounded-lg focus:bg-black/90 focus:px-4 focus:py-2 focus:text-white focus:outline-none">
+          Skip to main content
+        </a>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} forcedTheme="dark">
-          <main>{children}</main>
+          <main id="main">{children}</main>
           <Navbar />
           <BackToTop />
         </ThemeProvider>

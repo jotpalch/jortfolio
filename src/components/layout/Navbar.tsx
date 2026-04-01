@@ -15,7 +15,7 @@ export default function Navbar() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
+    <nav className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2" aria-label="Main navigation">
       <div className="flex items-center gap-0.5 rounded-full border border-white/10 bg-black/50 px-1.5 py-1 shadow-2xl backdrop-blur-xl sm:gap-1 sm:px-2 sm:py-1.5">
         {links.map((link) => {
           const isActive = pathname === link.href;

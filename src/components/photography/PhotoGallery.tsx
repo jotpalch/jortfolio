@@ -582,6 +582,7 @@ export default function PhotoGallery() {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+  const [noWebGL, setNoWebGL] = useState(false);
   const [scrolledDown, setScrolledDown] = useState(false);
   const [filmType, setFilmType] = useState<string | null>(null);
 
@@ -594,6 +595,10 @@ export default function PhotoGallery() {
     const check = () => setIsMobile(window.innerWidth < 768);
     check();
     window.addEventListener("resize", check);
+    try {
+      const canvas = document.createElement("canvas");
+      if (!canvas.getContext("webgl") && !canvas.getContext("webgl2")) setNoWebGL(true);
+    } catch { setNoWebGL(true); }
     return () => window.removeEventListener("resize", check);
   }, []);
 
@@ -648,7 +653,7 @@ export default function PhotoGallery() {
   return (
     <div className="relative">
       <div className="pointer-events-auto fixed left-6 top-6 z-50 md:left-1/2 md:-translate-x-1/2">
-        <div className="relative flex w-fit items-center gap-1 rounded-full border border-white/10 bg-black/50 px-2 py-1.5 shadow-2xl backdrop-blur-xl">
+        <div className="relative flex w-fit items-center gap-1 rounded-full border border-white/10 bg-black/50 px-2 py-1.5 shadow-2xl backdrop-blur-xl" role="toolbar" aria-label="Photo filters">
           {/* Sliding glass indicator */}
           <div
             className="absolute rounded-full bg-white/15 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
@@ -677,7 +682,7 @@ export default function PhotoGallery() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.2 }}
-              className="mt-2 flex flex-wrap items-center justify-center gap-1"
+              className="absolute left-0 right-0 mt-2 flex flex-wrap items-center justify-center gap-1 md:left-1/2 md:right-auto md:-translate-x-1/2"
             >
               <div className="flex items-center gap-1 rounded-full border border-white/10 bg-black/50 px-1.5 py-1 shadow-lg backdrop-blur-xl">
                 {[null, ...filmTypes].map((ft) => {
@@ -701,7 +706,7 @@ export default function PhotoGallery() {
         </AnimatePresence>
       </div>
 
-      {isMobile ? (
+      {isMobile || noWebGL ? (
         <MobileGallery photos={filteredPhotos} onPhotoClick={openLightbox} hasSubFilter={filter === "film"} />
       ) : (
         <DomeWall photos={filteredPhotos} onPhotoClick={openLightbox} spinning={spinning} />

@@ -27,6 +27,15 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Safe area insets for notched devices */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .fixed.bottom-6,
+  .fixed.bottom-20,
+  .fixed.bottom-32 {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
 /* Dark-first (visionOS) */
 :root {
   color-scheme: dark;

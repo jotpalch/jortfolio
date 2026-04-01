@@ -727,3 +727,104 @@ test("Articles — list loads within 5 seconds", async ({ page }) => {
   const elapsed = Date.now() - start;
   expect(elapsed).toBeLessThan(5000);
 });
+
+// ─── SEO: Open Graph & Twitter Cards ───────────────────
+for (const { name, path } of pages) {
+  test(`${name} — has og:image meta tag`, async ({ page }) => {
+    await page.goto(path, { waitUntil: "domcontentloaded" });
+    const ogImage = page.locator('meta[property="og:image"]');
+    await expect(ogImage).toHaveAttribute("content", /og-image/);
+  });
+}
+
+test("Home — has twitter:card meta tag", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const card = page.locator('meta[name="twitter:card"]');
+  await expect(card).toHaveAttribute("content", "summary_large_image");
+});
+
+test("Home — has JSON-LD structured data", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const jsonLd = page.locator('script[type="application/ld+json"]');
+  const content = await jsonLd.textContent();
+  expect(content).toContain("Wei-Cheng Chen");
+  expect(content).toContain("NVIDIA");
+});
+
+test("Home — og:image file is accessible", async ({ page }) => {
+  const response = await page.goto("/og-image.png");
+  expect(response?.ok()).toBeTruthy();
+});
+
+// ─── SEO: Article OG metadata ──────────────────────────
+test("Article — has og:type article", async ({ page }) => {
+  await page.goto("/articles/ricoh-gr3x-hdf-review-zhtw", { waitUntil: "domcontentloaded" });
+  const ogType = page.locator('meta[property="og:type"]');
+  await expect(ogType).toHaveAttribute("content", "article");
+});
+
+test("Article — has og:article:published_time", async ({ page }) => {
+  await page.goto("/articles/ricoh-gr3x-hdf-review-zhtw", { waitUntil: "domcontentloaded" });
+  const published = page.locator('meta[property="article:published_time"]');
+  expect(await published.count()).toBeGreaterThan(0);
+});
+
+// ─── Accessibility ─────────────────────────────────────
+test("Home — has skip to main content link", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const skip = page.locator('a[href="#main"]');
+  expect(await skip.count()).toBe(1);
+});
+
+test("Home — main element has id", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const main = page.locator("main#main");
+  await expect(main).toBeVisible();
+});
+
+test("Home — nav has aria-label", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const nav = page.locator('nav[aria-label="Main navigation"]');
+  await expect(nav).toBeVisible();
+});
+
+test("Photography — filter bar has aria-label", async ({ page }) => {
+  await page.goto("/photography", { waitUntil: "domcontentloaded" });
+  const toolbar = page.locator('[role="toolbar"][aria-label="Photo filters"]');
+  await expect(toolbar).toBeVisible();
+});
+
+// ─── Error handling ────────────────────────────────────
+test("404 — custom page renders", async ({ page }) => {
+  const response = await page.goto("/nonexistent-page-xyz", { waitUntil: "domcontentloaded" });
+  expect(response?.status()).toBe(404);
+  await expect(page.locator("body")).toContainText(/not found|darkroom|404/i);
+});
+
+// ─── Photography: film sub-filters ─────────────────────
+test("Photography — film sub-filter appears", async ({ page }) => {
+  await page.goto("/photography", { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "Negative Film" }).click();
+  await page.waitForTimeout(300);
+  await expect(page.getByRole("button", { name: /Portra/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Gold/ })).toBeVisible();
+});
+
+test("Photography — film sub-filter filters photos", async ({ page }) => {
+  await page.goto("/photography", { waitUntil: "domcontentloaded" });
+  const countEl = page.locator("span.font-mono").first();
+  await page.getByRole("button", { name: "Negative Film" }).click();
+  await page.waitForTimeout(300);
+  const filmCount = await countEl.textContent();
+  await page.getByRole("button", { name: /Portra/ }).click();
+  await page.waitForTimeout(300);
+  const portraCount = await countEl.textContent();
+  expect(Number(portraCount)).toBeLessThan(Number(filmCount));
+});
+
+// ─── Font preconnect ───────────────────────────────────
+test("Home — has font preconnect hints", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const preconnect = page.locator('link[rel="preconnect"][href="https://fonts.googleapis.com"]');
+  expect(await preconnect.count()).toBeGreaterThan(0);
+});
