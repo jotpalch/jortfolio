@@ -576,7 +576,7 @@ test("Photography — filter All restores count", async ({ page }) => {
   const allCount = await countEl.textContent();
   await page.getByRole("button", { name: "Negative Film" }).click();
   await page.waitForTimeout(300);
-  await page.getByRole("button", { name: "All" }).click();
+  await page.getByRole("button", { name: "All" }).first().click();
   await page.waitForTimeout(300);
   const restored = await countEl.textContent();
   expect(restored).toBe(allCount);
@@ -702,9 +702,9 @@ test("Nav — full navigation flow", async ({ page }) => {
 test("Mobile — photography page loads", async ({ page }, testInfo) => {
   if (testInfo.project.name !== "mobile") return test.skip();
   await page.goto("/photography", { waitUntil: "domcontentloaded" });
-  // Mobile shows grid, not canvas
-  const grid = page.locator(".grid");
-  await expect(grid).toBeVisible({ timeout: 5000 });
+  // Mobile shows masonry gallery, not canvas
+  const gallery = page.locator(".mobile-gallery");
+  await expect(gallery).toBeVisible({ timeout: 5000 });
 });
 
 test("Mobile — photography filter visible", async ({ page }, testInfo) => {

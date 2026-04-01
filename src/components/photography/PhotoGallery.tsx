@@ -528,7 +528,7 @@ function MobileGallery({ photos, onPhotoClick }: { photos: Photo[]; onPhotoClick
   const [tapped, setTapped] = useState<number | null>(null);
 
   return (
-    <div className="min-h-screen columns-2 gap-0.5 bg-black pb-20">
+    <div className="mobile-gallery min-h-screen columns-2 gap-0.5 bg-black pb-20">
       {[...photos, ...photos].map((photo, i) => {
         const showInfo = tapped === i;
         const hasInfo = photo.camera || photo.film || photo.focalLength || photo.date;
