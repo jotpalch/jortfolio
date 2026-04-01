@@ -3,7 +3,10 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Image from "next/image";
 import Lightbox from "yet-another-react-lightbox";
+import Captions from "yet-another-react-lightbox/plugins/captions";
 import "yet-another-react-lightbox/styles.css";
+import "yet-another-react-lightbox/plugins/captions.css";
+import { AnimatePresence, motion } from "framer-motion";
 import { photosData, type Photo } from "@/data/photos";
 import { optimizedSrc, getBlurDataURL } from "@/lib/photo-utils";
 import DiceButton from "./DiceButton";
@@ -28,7 +31,8 @@ function buildJustifiedRows(photos: Photo[]): { tiles: TileData[]; totalH: numbe
   const fullArc = Math.PI * 2;
   const tiles: TileData[] = [];
 
-  const bestRows = Math.min(2, photos.length);
+  const totalNaturalWidth = photos.reduce((sum, p) => sum + TARGET_ROW_H * (p.width / p.height), 0);
+  const bestRows = Math.max(2, Math.ceil(totalNaturalWidth / circumference));
   const perRow = Math.ceil(photos.length / bestRows);
   let y = 0;
 
@@ -435,6 +439,7 @@ function DomeWall({ photos, onPhotoClick, spinning }: { photos: Photo[]; onPhoto
     dragDistRef.current = 0;
     lastXRef.current = e.clientX;
     lastYRef.current = e.clientY;
+    setHoverInfo(null);
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
   }, []);
 
@@ -493,10 +498,13 @@ function DomeWall({ photos, onPhotoClick, spinning }: { photos: Photo[]; onPhoto
           className="pointer-events-none fixed z-50 rounded-lg border border-white/10 bg-black/80 px-3 py-2 shadow-xl backdrop-blur-md"
           style={{ left: hoverInfo.x + 16, top: hoverInfo.y - 10 }}
         >
-          {(hoverInfo.photo.camera || hoverInfo.photo.film) && (
+          {(hoverInfo.photo.film || hoverInfo.photo.camera) && (
             <p className="text-[11px] font-medium text-white/90">
-              {hoverInfo.photo.camera || hoverInfo.photo.film}
+              {hoverInfo.photo.film || hoverInfo.photo.camera}
             </p>
+          )}
+          {hoverInfo.photo.film && hoverInfo.photo.camera && (
+            <p className="text-[10px] text-white/50">{hoverInfo.photo.camera}</p>
           )}
           <div className="flex gap-2 text-[10px] text-white/50">
             {hoverInfo.photo.focalLength && <span>{hoverInfo.photo.focalLength}</span>}
@@ -520,14 +528,14 @@ function MobileGallery({ photos, onPhotoClick }: { photos: Photo[]; onPhotoClick
   const [tapped, setTapped] = useState<number | null>(null);
 
   return (
-    <div className="grid min-h-screen grid-cols-2 gap-0.5 bg-black pb-20">
+    <div className="min-h-screen columns-2 gap-0.5 bg-black pb-20">
       {[...photos, ...photos].map((photo, i) => {
         const showInfo = tapped === i;
         const hasInfo = photo.camera || photo.film || photo.focalLength || photo.date;
         return (
           <div
             key={`${photo.src}-${i}`}
-            className="relative cursor-pointer overflow-hidden"
+            className="relative mb-0.5 cursor-pointer overflow-hidden"
             style={{ height: photo.width > photo.height ? 140 : 200 }}
             onClick={() => {
               if (showInfo) { onPhotoClick(photo); setTapped(null); }
@@ -547,11 +555,12 @@ function MobileGallery({ photos, onPhotoClick }: { photos: Photo[]; onPhotoClick
             {showInfo && (
               <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/20 to-transparent p-2.5">
                 <div className="flex flex-col gap-0.5 text-[10px] text-white/80">
-                  {(photo.camera || photo.film) && <span className="font-medium">{photo.camera || photo.film}</span>}
+                  {(photo.film || photo.camera) && <span className="font-medium">{photo.film || photo.camera}</span>}
+                  {photo.film && photo.camera && <span className="text-white/50">{photo.camera}</span>}
                   <span className="text-white/50">
                     {[photo.focalLength, photo.aperture, photo.shutter, photo.iso].filter(Boolean).join(" · ")}
                   </span>
-                  {photo.date && <span className="text-white/40">{photo.date}</span>}
+                  {(photo.date || photo.location) && <span className="text-white/40">{[photo.date, photo.location].filter(Boolean).join(" · ")}</span>}
                 </div>
                 <p className="mt-1 text-[9px] text-white/30">tap again to view</p>
               </div>
@@ -566,11 +575,18 @@ function MobileGallery({ photos, onPhotoClick }: { photos: Photo[]; onPhotoClick
 // ─── Main export ────────────────────────────────────────
 export default function PhotoGallery() {
   const [filter, setFilter] = useState<FilterType>("all");
-  const [shuffleSeed, setShuffleSeed] = useState(0);
+  const [shuffleSeed, setShuffleSeed] = useState(1);
   const [spinning, setSpinning] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+  const [scrolledDown, setScrolledDown] = useState(false);
+  const [filmType, setFilmType] = useState<string | null>(null);
+
+  const filmTypes = useMemo(() =>
+    [...new Set(photosData.filter(p => p.film).map(p => p.film!))],
+    []
+  );
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -579,10 +595,19 @@ export default function PhotoGallery() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
+  useEffect(() => {
+    const onScroll = () => setScrolledDown(window.scrollY > 500);
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   const filteredPhotos = useMemo(() => {
     const filtered = photosData.filter((p) => {
       if (filter === "digital") return !p.film;
-      if (filter === "film") return !!p.film;
+      if (filter === "film") {
+        if (filmType) return p.film === filmType;
+        return !!p.film;
+      }
       return true;
     });
     if (shuffleSeed === 0) return filtered;
@@ -593,7 +618,7 @@ export default function PhotoGallery() {
       [arr[i], arr[j]] = [arr[j], arr[i]];
     }
     return arr;
-  }, [filter, shuffleSeed]);
+  }, [filter, filmType, shuffleSeed]);
 
   const openLightbox = useCallback((photo: Photo) => {
     setLightboxIndex(photosData.indexOf(photo));
@@ -631,7 +656,7 @@ export default function PhotoGallery() {
             <button
               key={key}
               ref={(el) => { filterBtnsRef.current[i] = el; }}
-              onClick={() => setFilter(key)}
+              onClick={() => { setFilter(key); if (key !== "film") setFilmType(null); }}
               className={`relative z-10 rounded-full px-4 py-1.5 text-xs font-medium transition-colors duration-200 ${
                 filter === key ? "text-white" : "text-white/50 hover:text-white/80"
               }`}
@@ -643,6 +668,35 @@ export default function PhotoGallery() {
             {filteredPhotos.length}
           </span>
         </div>
+        <AnimatePresence>
+          {filter === "film" && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+              className="mt-2 flex flex-wrap items-center justify-center gap-1"
+            >
+              <div className="flex items-center gap-1 rounded-full border border-white/10 bg-black/50 px-1.5 py-1 shadow-lg backdrop-blur-xl">
+                {[null, ...filmTypes].map((ft) => {
+                  const label = ft === null ? "All" : ft.replace(/^Kodak /, "").replace(/^ILFORD /, "ILF ");
+                  const active = filmType === ft;
+                  return (
+                    <button
+                      key={ft ?? "all"}
+                      onClick={() => setFilmType(ft)}
+                      className={`rounded-full px-3 py-1 text-[10px] font-medium transition-all duration-200 ${
+                        active ? "bg-white/15 text-white" : "text-white/40 hover:text-white/70"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {isMobile ? (
@@ -656,19 +710,41 @@ export default function PhotoGallery() {
         spinning={spinning}
         onDown={() => setSpinning(true)}
         onUp={() => { setSpinning(false); setShuffleSeed((s) => s + 1); }}
-        className="pointer-events-auto fixed bottom-20 right-6 z-50 md:bottom-6"
+        className={`pointer-events-auto fixed right-6 z-50 transition-all duration-300 ${scrolledDown ? "bottom-32" : "bottom-20"} md:bottom-6`}
       />
 
       <Lightbox
         open={lightboxOpen}
         close={() => setLightboxOpen(false)}
         index={lightboxIndex}
+        plugins={[Captions]}
         slides={photosData.map((photo) => ({
           src: optimizedSrc(photo.src, "lg"),
           alt: photo.alt,
           width: photo.width * 800,
           height: photo.height * 800,
+          title: (photo.film || photo.camera) ? (
+            <span style={{ fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600 }}>
+              {photo.film || photo.camera}
+              {photo.film && photo.camera && (
+                <span style={{ fontWeight: 400, opacity: 0.5, marginLeft: 8, fontSize: 12 }}>{photo.camera}</span>
+              )}
+            </span>
+          ) : undefined,
+          description: (() => {
+            const exif = [photo.focalLength, photo.aperture, photo.shutter, photo.iso].filter(Boolean);
+            const meta = [photo.date, photo.location].filter(Boolean);
+            if (!exif.length && !meta.length) return undefined;
+            return (
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, opacity: 0.6 }}>
+                {exif.length > 0 && <span>{exif.join(" · ")}</span>}
+                {exif.length > 0 && meta.length > 0 && <span style={{ margin: "0 8px" }}>|</span>}
+                {meta.length > 0 && <span>{meta.join(" · ")}</span>}
+              </span>
+            );
+          })(),
         }))}
+        captions={{ showToggle: true, descriptionTextAlign: "center" }}
         styles={{
           container: { backgroundColor: "rgba(0,0,0,0.85)" },
           slide: { padding: "40px 80px" },

@@ -164,7 +164,7 @@ export default function DiceButton({ spinning, onDown, onUp, className }: DiceBu
       title="Shuffle"
     >
       {/* Outer ring */}
-      <div className="flex h-[42px] w-[42px] cursor-pointer items-center justify-center rounded-full border border-white/10 bg-black/40 backdrop-blur-xl transition-all hover:bg-white/10 hover:scale-110">
+      <div className="flex h-9 w-9 md:h-[42px] md:w-[42px] cursor-pointer items-center justify-center overflow-hidden rounded-full border border-white/10 bg-black/40 backdrop-blur-xl transition-all hover:bg-white/10 hover:scale-110">
         <div className="dice-canvas" style={{ width: 36, height: 36 }} />
       </div>
     </div>
