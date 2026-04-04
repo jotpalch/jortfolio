@@ -26,7 +26,7 @@ export default function ProjectFilter({
         <button
           key={category}
           onClick={() => onCategoryChange(category)}
-          className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
+          className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-all ${
             activeCategory === category
               ? "bg-charcoal text-cream dark:bg-cream dark:text-warm-black"
               : "border border-[var(--border)] text-muted-brown hover:border-terracotta hover:text-terracotta"
