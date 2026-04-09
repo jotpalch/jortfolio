@@ -682,9 +682,9 @@ export default function PhotoGallery() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.2 }}
-              className="absolute left-0 right-0 mt-2 flex flex-wrap items-center justify-center gap-1 md:left-1/2 md:right-auto md:-translate-x-1/2"
+              className="absolute left-0 right-0 mt-2 flex items-center justify-center gap-1 md:left-1/2 md:right-auto md:-translate-x-1/2"
             >
-              <div className="flex items-center gap-1 rounded-full border border-white/10 bg-black/50 px-1.5 py-1 shadow-lg backdrop-blur-xl">
+              <div className="flex flex-nowrap items-center gap-1 rounded-full border border-white/10 bg-black/50 px-1.5 py-1 shadow-lg backdrop-blur-xl">
                 {[null, ...filmTypes].map((ft) => {
                   const label = ft === null ? "All" : ft.replace(/^Kodak /, "").replace(/^ILFORD /, "ILF ");
                   const active = filmType === ft;
