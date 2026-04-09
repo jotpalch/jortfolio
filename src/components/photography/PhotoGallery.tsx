@@ -692,7 +692,7 @@ export default function PhotoGallery() {
                     <button
                       key={ft ?? "all"}
                       onClick={() => setFilmType(ft)}
-                      className={`rounded-full px-3 py-1 text-[10px] font-medium transition-all duration-200 ${
+                      className={`rounded-full px-3 py-1 whitespace-nowrap text-[10px] font-medium transition-all duration-200 ${
                         active ? "bg-white/15 text-white" : "text-white/40 hover:text-white/70"
                       }`}
                     >
